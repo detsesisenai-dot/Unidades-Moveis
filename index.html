@@ -28,14 +28,9 @@
 <body class="bg-slate-100 overflow-hidden text-slate-900 font-sans">
     <div id="root"></div>
 
-    <!-- 
-      Script principal configurado com data-plugins="transform-react-jsx"
-      Isso burla o preset "react" automático do Babel, forçando a compilação clássica (React.createElement)
-      e evitando o erro de "import" no navegador estático.
-    -->
     <script type="text/babel" data-presets="env" data-plugins="transform-react-jsx">
         // ATENÇÃO: Sem uso de importações externas. Acessamos o React e Recharts globalmente.
-        const { useState, useMemo, useEffect } = window.React;
+        const { useState, useMemo, useEffect, useRef } = window.React;
         const { 
           BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, Legend, ResponsiveContainer,
           PieChart, Pie, Cell, LabelList
@@ -62,6 +57,38 @@
         const AREAS = ['Vestuário', 'Metalmecânica', 'TI', 'Alimentos', 'Eletroeletrônica', 'Automotiva', 'Construção Civil'];
         const UMS = ['UM-01 Confecção', 'UM-02 Solda', 'UM-03 Informática', 'UM-04 Panificação', 'UM-05 Eletroeletrônica', 'UM-06 Automotiva', 'UM-07 Indústria 4.0'];
 
+        const FROTA_DATA = [
+          { cod: 'U.M. Soldagem', unidade: 'SOLDAGEM', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JFP-8605', categoria: 'CARRETA', tempo: 11, ar: 2 },
+          { cod: 'U.M. Panificação', unidade: 'PANIFICAÇÃO', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JKF-9711', categoria: 'CARRETA', tempo: 11, ar: 4 },
+          { cod: 'U.M. Panificação Básica', unidade: 'MULTIFUNCIONAL 5 - CARRETA E', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBX-5501', categoria: 'CARRETA', tempo: 39, ar: 2 },
+          { cod: 'U.M. Refrigeração', unidade: 'MULTIFUNCIONAL 4 - CARRETA D', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBZ-4221', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'U.M. Instalações Elétricas', unidade: 'MULTIFUNCIONAL 3 - CARRETA C', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KBZ-4611', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'U.M. Mecânica Diesel', unidade: 'MULTIFUNCIONAL 6 - CARRETA F', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KCG-5255', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'U.M. Mec. Motocicletas', unidade: 'MULTIFUNCIONAL 7 - CARRETA G', origem: 'SENAI GO', status: 'REFORMA', placa: 'KDL-3081', categoria: 'CARRETA', tempo: 25, ar: 2 },
+          { cod: 'U.M. - Módulo ESCOLA MÓVEL', unidade: 'ESCOLA MÓVEL - CONTÊINERS', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'ND', categoria: 'CONTEINERS', tempo: 2024, ar: 5 },
+          { cod: 'U.M. Educon SESI', unidade: 'Multifuncional SESI EDUCON', origem: 'SESI GO', status: 'OPERACIONAL', placa: 'OGU-2707', categoria: 'CAMINHÃO', tempo: 12, ar: 2 },
+          { cod: 'CAVALO MECÂNICO', unidade: 'CAMINHÃO VW 19.330 ADVANTECH', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'OMW-0073', categoria: 'CAVALO MEC.', tempo: 10, ar: 0 },
+          { cod: 'U.M. Mecânica Industrial', unidade: 'MANUTENÇÃO INDUSTRIAL', origem: 'BNDS', status: 'OPERACIONAL', placa: 'OZW-6455', categoria: 'CARRETA', tempo: 9, ar: 4 },
+          { cod: 'U.M. Manut. Máquinas Agrícolas', unidade: 'MANUT. MÁQUINAS AGRÍCOLAS', origem: 'BNDS', status: 'MANUTENÇÃO', placa: 'PAC-9658', categoria: 'CARRETA', tempo: 9, ar: 4 },
+          { cod: 'U.M. Multi 2 - simples', unidade: 'MULTIFUNCIONAL 1 - CARRETA A', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK0J77', categoria: 'CARRETA', tempo: 2024, ar: 2 },
+          { cod: 'U.M. Multi 1 - com avanço', unidade: 'MULTIFUNCIONAL 2 - CARRETA B', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK1A17', categoria: 'CARRETA', tempo: 2024, ar: 4 }
+        ];
+
+        const MESES_OPCOES = [
+          { value: '2026-01-01', label: 'Janeiro / 2026' },
+          { value: '2026-02-01', label: 'Fevereiro / 2026' },
+          { value: '2026-03-01', label: 'Março / 2026' },
+          { value: '2026-04-01', label: 'Abril / 2026' },
+          { value: '2026-05-01', label: 'Maio / 2026' },
+          { value: '2026-06-01', label: 'Junho / 2026' },
+          { value: '2026-07-01', label: 'Julho / 2026' },
+          { value: '2026-08-01', label: 'Agosto / 2026' },
+          { value: '2026-09-01', label: 'Setembro / 2026' },
+          { value: '2026-10-01', label: 'Outubro / 2026' },
+          { value: '2026-11-01', label: 'Novembro / 2026' },
+          { value: '2026-12-01', label: 'Dezembro / 2026' }
+        ];
+
         const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
         const formatDate = (dateStr) => {
@@ -78,7 +105,6 @@
 
         function App() {
           const [view, setView] = useState('dashboard');
-          const [role, setRole] = useState('admin');
           const [atendimentos, setAtendimentos] = useState(INITIAL_DATA);
           const [searchTerm, setSearchTerm] = useState('');
           
@@ -160,9 +186,14 @@
           };
 
           const handleOpenModal = (item = null) => {
-            if (item) {
+            if (item && item.id) {
               setEditingItem(item.id);
               setFormData({ ...item });
+            } else if (item && !item.id) {
+              setEditingItem(null);
+              setFormData({
+                um: item.um || '', area: item.area || '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: item.matriculas || 0, cargaHoraria: item.cargaHoraria || 0, receita: item.receita || 0, impactoSocial: false
+              });
             } else {
               setEditingItem(null);
               setFormData({
@@ -174,11 +205,13 @@
 
           const handleSave = (e) => {
             e.preventDefault();
-            if (editingItem) {
-              setAtendimentos(atendimentos.map(a => a.id === editingItem ? { ...formData, id: editingItem } : a));
-            } else {
-              setAtendimentos([...atendimentos, { ...formData, id: Date.now() }]);
-            }
+            setAtendimentos(prev => {
+              if (editingItem) {
+                return prev.map(a => a.id === editingItem ? { ...formData, id: editingItem } : a);
+              } else {
+                return [...prev, { ...formData, id: Date.now() }];
+              }
+            });
             setIsModalOpen(false);
           };
 
@@ -187,7 +220,7 @@
           };
 
           const executeDelete = () => {
-            setAtendimentos(atendimentos.filter(a => a.id !== deleteConfirmId));
+            setAtendimentos(prev => prev.filter(a => a.id !== deleteConfirmId));
             setDeleteConfirmId(null);
           };
 
@@ -351,7 +384,7 @@
                           <p className="text-slate-500 text-xs">até {formatDate(item.fim)}</p>
                         </td>
                         <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border`} style={{
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border" style={{
                             backgroundColor: `${STATUS_COLORS[item.status]}15`,
                             color: STATUS_COLORS[item.status],
                             borderColor: `${STATUS_COLORS[item.status]}30`
@@ -365,20 +398,12 @@
                         </td>
                         <td className="p-4 text-center">
                           <div className="flex justify-center space-x-2">
-                            {(role === 'admin' || (role === 'user' && item.status === 'Agendado')) ? (
-                              <>
-                                <button onClick={() => handleOpenModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
-                                  <i className="fa-solid fa-pen"></i>
-                                </button>
-                                <button onClick={() => confirmDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
-                                  <i className="fa-solid fa-trash"></i>
-                                </button>
-                              </>
-                            ) : (
-                              <button disabled className="p-1.5 text-slate-300 cursor-not-allowed" title="Sem permissão">
-                                 <i className="fa-solid fa-shield-halved"></i>
-                              </button>
-                            )}
+                             <button onClick={() => handleOpenModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                               <i className="fa-solid fa-pen"></i>
+                             </button>
+                             <button onClick={() => confirmDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
+                               <i className="fa-solid fa-trash"></i>
+                             </button>
                           </div>
                         </td>
                       </tr>
@@ -398,7 +423,22 @@
           );
 
           const GanttView = () => {
-            const timelineStart = new Date('2026-06-01T00:00:00'); 
+            // Estados para os filtros
+            const [ganttFilterUM, setGanttFilterUM] = useState('');
+            const [ganttFilterStatus, setGanttFilterStatus] = useState('');
+            const [ganttStartDate, setGanttStartDate] = useState('2026-06-01');
+            
+            const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+            // Aplicação dos filtros nas unidades e atendimentos
+            const filteredUMs = ganttFilterUM ? UMS.filter(u => u === ganttFilterUM) : UMS;
+            const filteredGanttAtendimentos = atendimentos.filter(a => {
+              if (ganttFilterStatus && a.status !== ganttFilterStatus) return false;
+              return true;
+            });
+
+            // Geração Dinâmica dos Meses (4 meses a partir da data base selecionada)
+            const timelineStart = new Date(`${ganttStartDate}T00:00:00`); 
             const months = [];
             for(let i=0; i<4; i++) {
               let d = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + i, 1);
@@ -412,31 +452,61 @@
             const todayLeftPercent = (daysExactToToday / totalDaysTimeline) * 100;
             const isTodayInView = todayLeftPercent >= 0 && todayLeftPercent <= 100;
 
+            const handleMouseMove = (e) => {
+              setTooltipPos({ x: e.clientX, y: e.clientY });
+            };
+
             return (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px] animate-in fade-in duration-500">
-                <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px] animate-in fade-in duration-500 relative">
+                
+                {/* Cabeçalho do Gantt e Barra de Filtros */}
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                   <div>
-                    <h3 className="font-semibold text-slate-800">Mapa de Ocupação (Gantt)</h3>
-                    <p className="text-xs text-slate-500">Visão de Ocupação da Frota</p>
+                    <h3 className="font-semibold text-slate-800 flex items-center"><i className="fa-solid fa-list-check mr-2 text-blue-600"></i> Mapa de Ocupação (Gantt)</h3>
+                    <p className="text-xs text-slate-500 mt-1">Visão de ocupação num horizonte de 4 meses.</p>
                   </div>
-                  <div className="flex items-center space-x-3 text-xs">
-                    <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> Agendado</span>
-                    <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-500 mr-1"></span> Andamento</span>
-                    <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-500 mr-1"></span> Manutenção</span>
+                  
+                  {/* Filtros Suspensos */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={ganttFilterUM} onChange={e => setGanttFilterUM(e.target.value)}>
+                          <option value="">Todas as Unidades</option>
+                          {UMS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={ganttFilterStatus} onChange={e => setGanttFilterStatus(e.target.value)}>
+                          <option value="">Todos os Status</option>
+                          {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={ganttStartDate} onChange={e => setGanttStartDate(e.target.value)}>
+                          {MESES_OPCOES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-auto flex">
                   <div className="w-48 sm:w-64 border-r border-slate-200 flex-shrink-0 bg-white sticky left-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                     <div className="h-12 border-b border-slate-200 bg-slate-50"></div>
-                    {UMS.map((um) => (
+                    {filteredUMs.map((um) => (
                       <div key={um} className="h-16 flex flex-col justify-center px-4 border-b border-slate-100">
-                        <span className="text-sm font-medium text-slate-800 truncate">{um}</span>
+                        <span className="text-sm font-medium text-slate-800 truncate" title={um}>{um}</span>
                       </div>
                     ))}
+                    {filteredUMs.length === 0 && (
+                      <div className="h-16 flex flex-col justify-center px-4">
+                        <span className="text-xs text-slate-400">Nenhuma unidade encontrada.</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex-1 min-w-[800px] relative">
+                  <div className="flex-1 min-w-[800px] relative" onMouseMove={handleMouseMove}>
                     {isTodayInView && (
                       <div className="absolute top-0 bottom-0 border-l-2 border-[#ED1C24] border-dashed z-20 pointer-events-none flex flex-col items-center" style={{ left: `${todayLeftPercent}%` }}>
                         <div className="bg-[#ED1C24] text-white text-[10px] px-2 py-0.5 rounded-b font-bold shadow-sm whitespace-nowrap -translate-x-1/2 mt-0">Hoje</div>
@@ -451,14 +521,14 @@
                       ))}
                     </div>
 
-                    <div className="relative" style={{ height: `${UMS.length * 4}rem` }}>
+                    <div className="relative" style={{ height: `${Math.max(filteredUMs.length * 4, 1)}rem` }}>
                       {months.map((m, i) => {
                         const prevDays = months.slice(0, i).reduce((acc, curr) => acc + curr.days, 0);
                         return <div key={i} className="absolute top-0 bottom-0 border-l border-slate-100 z-0" style={{ left: `${(prevDays / totalDaysTimeline) * 100}%` }}></div>;
                       })}
 
-                      {UMS.map((um, rowIndex) => {
-                        const umAtendimentos = atendimentos.filter(a => a.um === um);
+                      {filteredUMs.map((um, rowIndex) => {
+                        const umAtendimentos = filteredGanttAtendimentos.filter(a => a.um === um);
                         return (
                           <div key={rowIndex} className="h-16 border-b border-slate-100 relative group hover:bg-slate-50/50 z-10">
                             {umAtendimentos.map(atend => {
@@ -479,10 +549,10 @@
                                   key={atend.id}
                                   className="absolute top-3 h-10 rounded-md shadow-sm flex items-center px-2 text-white text-xs truncate cursor-pointer transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden"
                                   style={{ left: `${Math.max(0, leftPercent)}%`, width: `${widthPercent}%`, backgroundColor: STATUS_COLORS[atend.status] }}
-                                  title={`${atend.escola} (${formatDate(atend.inicio)} a ${formatDate(atend.fim)})`}
+                                  title={`Cliente: ${atend.escola}\nPeríodo: ${formatDate(atend.inicio)} a ${formatDate(atend.fim)}\nStatus: ${atend.status}`}
                                   onClick={() => handleOpenModal(atend)}
                                 >
-                                  <span className="truncate w-full drop-shadow-sm">{atend.escola}</span>
+                                  <span className="truncate w-full drop-shadow-sm font-medium">{atend.escola}</span>
                                 </div>
                               );
                             })}
@@ -491,6 +561,177 @@
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            );
+          };
+
+          const FrotaView = () => (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Quadro de Status da Frota</h3>
+                  <p className="text-xs text-slate-500">Listagem completa do parque de Unidades Móveis e documentação</p>
+                </div>
+                <div className="flex space-x-2">
+                  <span className="inline-flex items-center px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold"><i className="fa-solid fa-circle-check mr-1"></i> Operacional</span>
+                  <span className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-bold"><i className="fa-solid fa-wrench mr-1"></i> Reforma</span>
+                  <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold"><i className="fa-solid fa-triangle-exclamation mr-1"></i> Manutenção</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
+                      <th className="p-3 font-semibold">Cód. U.Móvel</th>
+                      <th className="p-3 font-semibold">Unidade / Origem</th>
+                      <th className="p-3 font-semibold text-center">Status Operacional</th>
+                      <th className="p-3 font-semibold">Placa / Categoria</th>
+                      <th className="p-3 font-semibold text-center">Tempo (Anos)</th>
+                      <th className="p-3 font-semibold text-center">Und. Ar Cond.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {FROTA_DATA.map((frota, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 font-bold text-[#005CAA] whitespace-nowrap">{frota.cod}</td>
+                        <td className="p-3">
+                          <p className="text-slate-800 font-medium">{frota.unidade}</p>
+                          <p className="text-xs text-slate-500 uppercase">{frota.origem}</p>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
+                            frota.status === 'OPERACIONAL' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
+                            frota.status === 'REFORMA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
+                            'bg-red-100 text-red-700 border-red-200'
+                          }`}>
+                            {frota.status}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <p className="text-slate-800 font-mono font-medium">{frota.placa}</p>
+                          <p className="text-xs text-slate-500">{frota.categoria}</p>
+                        </td>
+                        <td className="p-3 text-center text-slate-800 font-medium">{frota.tempo}</td>
+                        <td className="p-3 text-center text-slate-800 font-medium">{frota.ar}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+
+          const SimulacaoView = () => {
+            const [simUM, setSimUM] = window.React.useState('');
+            const [simAlunos, setSimAlunos] = window.React.useState(20);
+            const [simHoras, setSimHoras] = window.React.useState(40);
+            const [simBase, setSimBase] = window.React.useState(25);
+            const [simAdicional, setSimAdicional] = window.React.useState(0);
+
+            const simulacao = window.React.useMemo(() => {
+              const umObj = FROTA_DATA.find(u => u.cod === simUM);
+              let fatorMultiplicador = 1.0;
+              let cat = 'Padrão';
+              if (umObj) {
+                cat = umObj.categoria;
+                if (cat === 'CARRETA') fatorMultiplicador = 1.3;
+                else if (cat === 'CONTEINERS') fatorMultiplicador = 0.9;
+                else if (cat === 'CAVALO MEC.') fatorMultiplicador = 0.5;
+              }
+
+              const subtotalAlunos = Number(simAlunos) * Number(simHoras) * Number(simBase);
+              const valorComFator = subtotalAlunos * fatorMultiplicador;
+              const total = valorComFator + Number(simAdicional);
+
+              return { umObj, fatorMultiplicador, cat, subtotalAlunos, valorComFator, total };
+            }, [simUM, simAlunos, simHoras, simBase, simAdicional]);
+
+            const agendarSimulacao = () => {
+              handleOpenModal({
+                um: simulacao.umObj ? simulacao.umObj.cod : '',
+                matriculas: simAlunos,
+                cargaHoraria: simHoras,
+                receita: simulacao.total
+              });
+            };
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2"><i className="fa-solid fa-calculator text-blue-600 mr-2"></i> Parâmetros da Simulação</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
+                      <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                        value={simUM} onChange={e => setSimUM(e.target.value)}>
+                        <option value="">Selecione uma Unidade da Frota...</option>
+                        {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod} ({u.categoria}) - Status: {u.status}</option>)}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade de Alunos Prevista</label>
+                      <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        value={simAlunos} onChange={e => setSimAlunos(e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária (h)</label>
+                      <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        value={simHoras} onChange={e => setSimHoras(e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Preço Base Sugerido (R$ / Aluno / Hora)</label>
+                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        value={simBase} onChange={e => setSimBase(e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Custos Logísticos/Adicionais (R$)</label>
+                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                        value={simAdicional} onChange={e => setSimAdicional(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#002f5c] rounded-xl shadow-lg border border-[#001529] p-6 text-white flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                     <i className="fa-solid fa-file-invoice-dollar text-9xl"></i>
+                  </div>
+                  <h3 className="text-lg font-bold text-blue-200 mb-4 border-b border-white/10 pb-2 relative z-10">Resumo da Cotação</h3>
+                  
+                  <div className="flex-1 space-y-4 relative z-10">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-blue-100">Subtotal (Alunos x H):</span>
+                      <span className="font-medium">{formatCurrency(simulacao.subtotalAlunos)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-blue-100">Fator Categoria U.M:</span>
+                      <span className="font-medium text-amber-300">{simulacao.cat} (x{simulacao.fatorMultiplicador})</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-blue-100">Valor Ajustado:</span>
+                      <span className="font-medium">{formatCurrency(simulacao.valorComFator)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm border-b border-white/10 pb-4">
+                      <span className="text-blue-100">Logística/Deslocamento:</span>
+                      <span className="font-medium text-emerald-300">+{formatCurrency(simAdicional)}</span>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <p className="text-xs text-blue-300 uppercase tracking-wider mb-1">Preço Final Estimado</p>
+                      <p className="text-3xl font-black text-white">{formatCurrency(simulacao.total)}</p>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={agendarSimulacao}
+                    className="w-full mt-6 bg-[#ED1C24] hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex justify-center items-center relative z-10">
+                    <i className="fa-solid fa-calendar-check mr-2"></i> Converter em Reserva
+                  </button>
                 </div>
               </div>
             );
@@ -543,14 +784,12 @@
                         <label className="block text-sm font-medium text-slate-700 mb-1">Status Operacional</label>
                         <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}
-                          disabled={role === 'user' && !editingItem}
                         >
                           <option value="Agendado">Agendado (Solicitado)</option>
                           <option value="Em Andamento">Em Andamento</option>
                           <option value="Concluído">Concluído</option>
                           <option value="Manutenção">Manutenção / Deslocamento</option>
                         </select>
-                        {role === 'user' && <p className="text-xs text-slate-500 mt-1">Apenas CMOV altera para Em Andamento.</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
@@ -640,15 +879,13 @@
                   <button onClick={() => setView('gantt')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'gantt' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
                     <i className="fa-solid fa-truck text-lg mr-3 w-5"></i> Monitoramento Frota
                   </button>
+                  <button onClick={() => setView('frota')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'frota' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
+                    <i className="fa-solid fa-truck-fast text-lg mr-3 w-5"></i> Quadro da Frota
+                  </button>
+                  <button onClick={() => setView('simulacao')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'simulacao' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
+                    <i className="fa-solid fa-calculator text-lg mr-3 w-5"></i> Simulador Contrato
+                  </button>
                 </nav>
-                
-                <div className="p-4 bg-[#002040] border-t border-white/10">
-                  <p className="text-xs text-blue-300 font-semibold mb-2 uppercase tracking-wider">Simulador de Perfil</p>
-                  <div className="flex bg-[#001529] rounded-lg p-1">
-                    <button onClick={() => setRole('admin')} className={`flex-1 text-xs py-1.5 rounded-md transition-all ${role === 'admin' ? 'bg-[#005CAA] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-white'}`}>CMOV</button>
-                    <button onClick={() => setRole('user')} className={`flex-1 text-xs py-1.5 rounded-md transition-all ${role === 'user' ? 'bg-[#005CAA] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-white'}`}>Escola / RM</button>
-                  </div>
-                </div>
               </aside>
 
               <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
@@ -664,10 +901,10 @@
                   <div className="flex items-center space-x-4">
                      <div className="md:hidden flex items-center bg-slate-100 rounded-full px-3 py-1 border border-slate-200">
                        <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
-                       <span className="text-xs font-semibold text-slate-600">{role === 'admin' ? 'CMOV' : 'Escola'}</span>
+                       <span className="text-xs font-semibold text-slate-600">Admin</span>
                      </div>
                     <div className="w-8 h-8 rounded-full bg-[#005CAA] text-white flex items-center justify-center font-bold text-sm shadow-inner cursor-pointer hover:ring-2 ring-offset-2 ring-blue-500 transition">
-                      {role === 'admin' ? 'CM' : 'ES'}
+                      AD
                     </div>
                   </div>
                 </header>
@@ -678,6 +915,8 @@
                       <button onClick={() => {setView('dashboard'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'dashboard' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-chart-line mr-2"></i> Dashboard</button>
                       <button onClick={() => {setView('reservas'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'reservas' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calendar-days mr-2"></i> Reservas</button>
                       <button onClick={() => {setView('gantt'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'gantt' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck mr-2"></i> Gantt Frota</button>
+                      <button onClick={() => {setView('frota'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'frota' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck-fast mr-2"></i> Quadro da Frota</button>
+                      <button onClick={() => {setView('simulacao'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'simulacao' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calculator mr-2"></i> Simulador Contrato</button>
                     </nav>
                   </div>
                 )}
@@ -689,6 +928,8 @@
                         {view === 'dashboard' && 'Visão Geral CMOV'}
                         {view === 'reservas' && 'Gestão de Reservas U.M'}
                         {view === 'gantt' && 'Monitoramento e Cronograma'}
+                        {view === 'frota' && 'Status Operacional da Frota'}
+                        {view === 'simulacao' && 'Simulador de Contratos'}
                       </h2>
                       <p className="text-slate-500 text-sm mt-1">Acompanhe e gerencie a frota de unidades móveis do SENAI Goiás.</p>
                     </div>
@@ -702,6 +943,8 @@
                   {view === 'dashboard' && <DashboardView />}
                   {view === 'reservas' && <ReservasView />}
                   {view === 'gantt' && <GanttView />}
+                  {view === 'frota' && <FrotaView />}
+                  {view === 'simulacao' && <SimulacaoView />}
                 </div>
               </main>
 
