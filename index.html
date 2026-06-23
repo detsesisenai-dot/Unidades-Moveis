@@ -35,7 +35,6 @@
           PieChart, Pie, Cell, LabelList
         } = window.Recharts;
 
-        // Constants and Data
         const ESCOLAS_SENAI = [
             "FATEC SENAI Ítalo Bologna", "SENAI Vila Canaã", "SENAI Anápolis", 
             "SENAI Rio Verde", "SENAI Catalão", "SENAI Itumbiara", "SENAI Trindade",
@@ -108,19 +107,22 @@
         };
 
         function App() {
+          // General App States
           const [view, setView] = useState('dashboard');
-          const [isAdmin, setIsAdmin] = useState(false); // Toggle for CMOV specific views
+          const [isAdmin, setIsAdmin] = useState(false);
+          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          const [lastUpdated, setLastUpdated] = useState(() => localStorage.getItem('sigum_lastUpdated_v2') || null);
           
+          // Data States
           const [atendimentos, setAtendimentos] = useState(() => {
             try {
-              const savedData = localStorage.getItem('sigum_atendimentos');
+              const savedData = localStorage.getItem('sigum_atendimentos_v2');
               if (savedData) {
                   let parsed = JSON.parse(savedData);
-                  // Force status evaluation on load & patch legacy names (Remover 'U.M. ')
                   return parsed.map(a => {
                       let cleanedUM = a.um || '';
                       cleanedUM = cleanedUM.replace(/^U\.M\.\s-\s/, '').replace(/^U\.M\.\s/, '');
-                      return {...a, um: cleanedUM, status: evaluateStatus(a.inicio, a.fim, a.status)};
+                      return {...a, um: cleanedUM, status: evaluateStatus(a.inicio, a.fim, a.statusOverride || a.status)};
                   });
               }
               return INITIAL_DATA;
@@ -129,72 +131,57 @@
             }
           });
 
-          const [lastUpdated, setLastUpdated] = useState(() => localStorage.getItem('sigum_lastUpdated') || null);
-          const [searchTerm, setSearchTerm] = useState('');
-          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          // Modal States
+          const [isModalOpen, setIsModalOpen] = useState(false);
+          const [editingItem, setEditingItem] = useState(null);
           const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+          const [formData, setFormData] = useState({
+            um: '', area: '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: ''
+          });
+
+          // Dashboard Filters
+          const [dashAno, setDashAno] = useState('');
+          const [dashEscola, setDashEscola] = useState('');
+          const [dashUM, setDashUM] = useState('');
+
+          // Reservas Filters
+          const [searchTerm, setSearchTerm] = useState('');
+          const [resFilterUM, setResFilterUM] = useState('');
+          const [resFilterEscola, setResFilterEscola] = useState('');
+          const [resFilterInicio, setResFilterInicio] = useState('');
+          const [resFilterFim, setResFilterFim] = useState('');
+          const [resFilterStatus, setResFilterStatus] = useState('');
+
+          // Gantt Filters
+          const [ganttFilterUM, setGanttFilterUM] = useState('');
+          const [ganttFilterStatus, setGanttFilterStatus] = useState('');
+          const [ganttStartDate, setGanttStartDate] = useState('2026-06-01');
+
+          // Frota Filters
+          const [frotaFilterCod, setFrotaFilterCod] = useState('');
+          const [frotaFilterOrigem, setFrotaFilterOrigem] = useState('');
+          const [frotaFilterStatus, setFrotaFilterStatus] = useState('');
+          const [frotaFilterCat, setFrotaFilterCat] = useState('');
+
+          // Simulacao States
+          const [simUM, setSimUM] = useState('');
+          const [simHoras, setSimHoras] = useState(160);
+          const [simBase, setSimBase] = useState(400);
+          const [simAdicional, setSimAdicional] = useState(0);
 
           useEffect(() => {
             try {
-              localStorage.setItem('sigum_atendimentos', JSON.stringify(atendimentos));
+              localStorage.setItem('sigum_atendimentos_v2', JSON.stringify(atendimentos));
             } catch (e) {}
           }, [atendimentos]);
 
           useEffect(() => {
-            if (lastUpdated) localStorage.setItem('sigum_lastUpdated', lastUpdated);
+            if (lastUpdated) localStorage.setItem('sigum_lastUpdated_v2', lastUpdated);
           }, [lastUpdated]);
 
           const recordUpdate = () => setLastUpdated(new Date().toLocaleString('pt-BR'));
 
-          const kpis = useMemo(() => {
-            return atendimentos.reduce((acc, curr) => {
-              if (curr.status !== 'Manutenção' && curr.status !== 'Cancelado') {
-                acc.matriculas += Number(curr.matriculas) || 0;
-                acc.cargaHoraria += Number(curr.cargaHoraria) || 0;
-                acc.receita += Number(curr.receita) || 0;
-              }
-              acc.total++;
-              if (curr.status === 'Em Andamento') acc.ativos++;
-              return acc;
-            }, { total: 0, ativos: 0, matriculas: 0, cargaHoraria: 0, receita: 0 });
-          }, [atendimentos]);
-
-          const chartDataArea = useMemo(() => {
-            const data = {};
-            atendimentos.forEach(a => {
-              if (!data[a.area]) data[a.area] = { name: a.area, Atendimentos: 0, matriculas: 0, receita: 0, cargaHoraria: 0 };
-              data[a.area].Atendimentos++;
-              data[a.area].matriculas += Number(a.matriculas) || 0;
-              data[a.area].receita += Number(a.receita) || 0;
-              data[a.area].cargaHoraria += Number(a.cargaHoraria) || 0;
-            });
-            return Object.values(data).sort((a, b) => b.Atendimentos - a.Atendimentos);
-          }, [atendimentos]);
-
-          const chartDataStatus = useMemo(() => {
-            const data = {};
-            atendimentos.forEach(a => {
-              if (!data[a.status]) data[a.status] = { name: a.status, value: 0, matriculas: 0, receita: 0, cargaHoraria: 0, color: STATUS_COLORS[a.status] };
-              data[a.status].value++;
-              data[a.status].matriculas += Number(a.matriculas) || 0;
-              data[a.status].receita += Number(a.receita) || 0;
-              data[a.status].cargaHoraria += Number(a.cargaHoraria) || 0;
-            });
-            return Object.values(data);
-          }, [atendimentos]);
-
-          const chartDataUM = useMemo(() => {
-            const data = {};
-            atendimentos.forEach(a => {
-              const shortName = a.um;
-              if (!data[shortName]) data[shortName] = { name: shortName, fullName: a.um, matriculas: 0, receita: 0, Atendimentos: 0 };
-              data[shortName].Atendimentos++;
-              data[shortName].matriculas += Number(a.matriculas) || 0;
-              data[shortName].receita += Number(a.receita) || 0;
-            });
-            return Object.values(data).sort((a,b) => a.name.localeCompare(b.name));
-          }, [atendimentos]);
-
+          // Common Tooltip used across all charts
           const CustomTooltip = ({ active, payload, label }) => {
             if (active && payload && payload.length) {
               const data = payload[0].payload;
@@ -202,7 +189,7 @@
                 <div className="bg-white p-4 border border-slate-200 shadow-xl rounded-xl text-sm min-w-[220px] z-50">
                   <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{data.fullName || label || data.name}</p>
                   <div className="space-y-2">
-                    <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Qtd. Atendimentos:</span> <span>{data.Atendimentos || data.value}</span></p>
+                    {data.Atendimentos !== undefined && <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Atendimentos:</span> <span>{data.Atendimentos || data.value}</span></p>}
                     <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Matrículas:</span> <span>{data.matriculas?.toLocaleString('pt-BR') || 0}</span></p>
                     <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Carga Horária:</span> <span>{data.cargaHoraria ? `${data.cargaHoraria.toLocaleString('pt-BR')}h` : '0h'}</span></p>
                     <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Receita Prevista:</span> <span className="font-semibold text-emerald-600">{formatCurrency(data.receita || 0)}</span></p>
@@ -213,288 +200,256 @@
             return null;
           };
 
-          const DashboardView = () => (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
-                  <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><i className="fa-solid fa-truck text-2xl"></i></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium">U.Ms em Operação</p>
-                    <p className="text-2xl font-bold text-slate-800">{kpis.ativos} <span className="text-sm font-normal text-slate-400">/ {FROTA_DATA.length}</span></p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
-                  <div className="p-3 bg-emerald-100 text-emerald-700 rounded-lg"><i className="fa-solid fa-users text-2xl"></i></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium">Total Matrículas</p>
-                    <p className="text-2xl font-bold text-slate-800">{kpis.matriculas.toLocaleString('pt-BR')}</p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
-                  <div className="p-3 bg-amber-100 text-amber-700 rounded-lg"><i className="fa-solid fa-clock text-2xl"></i></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium">Carga Horária (h)</p>
-                    <p className="text-2xl font-bold text-slate-800">{kpis.cargaHoraria.toLocaleString('pt-BR')}</p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
-                  <div className="p-3 bg-indigo-100 text-indigo-700 rounded-lg"><i className="fa-solid fa-dollar-sign text-2xl px-1"></i></div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium">Receita Estimada</p>
-                    <p className="text-2xl font-bold text-slate-800">{formatCurrency(kpis.receita)}</p>
-                  </div>
-                </div>
-              </div>
+          // Available years for Dashboard filter
+          const dashAnosDisponiveis = useMemo(() => {
+            const anos = new Set();
+            atendimentos.forEach(a => {
+                if (a.inicio) anos.add(a.inicio.substring(0,4));
+                if (a.fim) anos.add(a.fim.substring(0,4));
+            });
+            return Array.from(anos).sort().reverse();
+          }, [atendimentos]);
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-chart-column mr-2 text-slate-500"></i> Atendimentos por Área</h3>
-                  <div className="flex-1 w-full min-h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartDataArea} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="name" tick={{fontSize: 12}} interval={0} angle={-35} textAnchor="end" height={60} />
-                        <YAxis tick={{fontSize: 12}} />
-                        <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
-                        <Bar dataKey="Atendimentos" fill="#0284c7" radius={[4, 4, 0, 0]}>
-                          <LabelList dataKey="Atendimentos" position="top" fill="#475569" fontSize={12} fontWeight={600} />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-chart-pie mr-2 text-slate-500"></i> Status da Frota</h3>
-                  <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                        <Pie
-                          data={chartDataStatus}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={65}
-                          outerRadius={95}
-                          paddingAngle={5}
-                          dataKey="value"
-                          labelLine={true}
-                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        >
-                          {chartDataStatus.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip content={<CustomTooltip />} />
-                        <Legend verticalAlign="bottom" height={36}/>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-
-          const ModalCadastro = () => {
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [editingItem, setEditingItem] = useState(null);
-            const [formData, setFormData] = useState({
-              um: '', escola: '', municipio: '', inicio: '', fim: '', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: ''
+          const renderDashboard = () => {
+            // Apply Dashboard Filters
+            const filteredDashAtendimentos = atendimentos.filter(a => {
+                const matchAno = dashAno === '' || (a.inicio && a.inicio.startsWith(dashAno)) || (a.fim && a.fim.startsWith(dashAno));
+                const matchEscola = dashEscola === '' || a.escola === dashEscola;
+                const matchUM = dashUM === '' || a.um === dashUM;
+                return matchAno && matchEscola && matchUM;
             });
 
-            // Listen for custom event to open modal from other components (like Simulacao)
-            useEffect(() => {
-                const handleOpen = (e) => {
-                    if (e.detail && e.detail.item) {
-                        setEditingItem(e.detail.item.id);
-                        setFormData({ ...e.detail.item, statusOverride: e.detail.item.status === 'Manutenção' ? 'Manutenção' : '' });
-                    } else if (e.detail && e.detail.prefill) {
-                        setEditingItem(null);
-                        setFormData({ ...e.detail.prefill, statusOverride: '' });
-                    } else {
-                        setEditingItem(null);
-                        setFormData({ um: '', escola: '', municipio: '', inicio: '', fim: '', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: '' });
-                    }
-                    setIsModalOpen(true);
-                };
-                window.addEventListener('openModalCadastro', handleOpen);
-                return () => window.removeEventListener('openModalCadastro', handleOpen);
-            }, []);
+            // Calculate active unique UMs based on filtered set
+            const activeUMs = new Set(filteredDashAtendimentos.filter(a => a.status === 'Em Andamento').map(a => a.um)).size;
 
-            if (!isModalOpen) return null;
+            const dashKpis = filteredDashAtendimentos.reduce((acc, curr) => {
+                if (curr.status !== 'Manutenção' && curr.status !== 'Cancelado') {
+                    acc.matriculas += Number(curr.matriculas) || 0;
+                    acc.cargaHoraria += Number(curr.cargaHoraria) || 0;
+                    acc.receita += Number(curr.receita) || 0;
+                }
+                return acc;
+            }, { matriculas: 0, cargaHoraria: 0, receita: 0 });
 
-            const handleSaveForm = (e) => {
-                e.preventDefault();
-                
-                // Lookup area based on UM
-                const umData = FROTA_DATA.find(u => u.cod === formData.um);
-                const area = umData ? umData.area : 'Indefinida';
-
-                // Determine final status
-                const finalStatus = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
-
-                const finalData = {
-                    ...formData,
-                    area: area,
-                    status: finalStatus
-                };
-
-                setAtendimentos(prev => {
-                  if (editingItem) {
-                    return prev.map(a => a.id === editingItem ? { ...finalData, id: editingItem } : a);
-                  } else {
-                    return [...prev, { ...finalData, id: Date.now() }];
-                  }
+            // Chart Data Builders
+            const getChartDataArea = () => {
+                const data = {};
+                filteredDashAtendimentos.forEach(a => {
+                    if (!data[a.area]) data[a.area] = { name: a.area, Atendimentos: 0, matriculas: 0, receita: 0, cargaHoraria: 0 };
+                    data[a.area].Atendimentos++;
+                    data[a.area].matriculas += Number(a.matriculas) || 0;
+                    data[a.area].receita += Number(a.receita) || 0;
+                    data[a.area].cargaHoraria += Number(a.cargaHoraria) || 0;
                 });
-                recordUpdate();
-                setIsModalOpen(false);
+                return Object.values(data).sort((a, b) => b.Atendimentos - a.Atendimentos);
             };
 
-            const autoStatusPreview = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
+            const getChartDataStatus = () => {
+                const data = {};
+                filteredDashAtendimentos.forEach(a => {
+                    if (!data[a.status]) data[a.status] = { name: a.status, value: 0, matriculas: 0, receita: 0, cargaHoraria: 0, color: STATUS_COLORS[a.status] };
+                    data[a.status].value++;
+                    data[a.status].matriculas += Number(a.matriculas) || 0;
+                    data[a.status].receita += Number(a.receita) || 0;
+                    data[a.status].cargaHoraria += Number(a.cargaHoraria) || 0;
+                });
+                return Object.values(data);
+            };
+
+            const getChartDataUM = () => {
+                const data = {};
+                filteredDashAtendimentos.forEach(a => {
+                    const shortName = a.um;
+                    if (!data[shortName]) data[shortName] = { name: shortName, fullName: a.um, matriculas: 0, receita: 0, Atendimentos: 0, cargaHoraria: 0 };
+                    data[shortName].Atendimentos++;
+                    data[shortName].matriculas += Number(a.matriculas) || 0;
+                    data[shortName].receita += Number(a.receita) || 0;
+                    data[shortName].cargaHoraria += Number(a.cargaHoraria) || 0;
+                });
+                return Object.values(data).sort((a,b) => a.name.localeCompare(b.name));
+            };
+
+            const getChartDataCliente = () => {
+                const data = {};
+                filteredDashAtendimentos.forEach(a => {
+                    const client = a.escola;
+                    if (!data[client]) data[client] = { name: client, fullName: client, matriculas: 0, receita: 0, Atendimentos: 0, cargaHoraria: 0 };
+                    data[client].Atendimentos++;
+                    data[client].matriculas += Number(a.matriculas) || 0;
+                    data[client].receita += Number(a.receita) || 0;
+                    data[client].cargaHoraria += Number(a.cargaHoraria) || 0;
+                });
+                // Ordenar por receita decrescente
+                return Object.values(data).sort((a,b) => b.receita - a.receita);
+            };
+
+            const chartDataArea = getChartDataArea();
+            const chartDataStatus = getChartDataStatus();
+            const chartDataUM = getChartDataUM();
+            const chartDataCliente = getChartDataCliente();
 
             return (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                      {editingItem ? <i className="fa-solid fa-pen mr-2 text-blue-600"></i> : <i className="fa-solid fa-plus mr-2 text-[#ED1C24]"></i>}
-                      {editingItem ? 'Editar Atendimento' : 'Nova Solicitação de U.Móvel'}
-                    </h2>
-                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
+              <div className="space-y-6 animate-in fade-in duration-500">
+                {/* Painel de Filtros do Dashboard */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="flex items-center text-slate-700 font-semibold w-full md:w-auto">
+                      <i className="fa-solid fa-filter mr-2 text-blue-600"></i> Filtros do Painel
                   </div>
-                  
-                  <div className="p-6 overflow-y-auto flex-1">
-                    <form id="reserva-form" onSubmit={handleSaveForm} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div className="col-span-1 sm:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Escola Solicitante / Cliente</label>
-                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                          value={formData.escola} onChange={e => setFormData({...formData, escola: e.target.value})}>
-                          <option value="">Selecione a Escola...</option>
+                  <div className="flex flex-wrap md:flex-nowrap items-center gap-3 w-full md:w-auto">
+                      <select className="flex-1 min-w-[140px] p-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value={dashAno} onChange={e => setDashAno(e.target.value)}>
+                          <option value="">Todos os Anos</option>
+                          {dashAnosDisponiveis.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+                      </select>
+                      <select className="flex-1 min-w-[140px] p-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value={dashEscola} onChange={e => setDashEscola(e.target.value)}>
+                          <option value="">Todos os Clientes</option>
                           {ESCOLAS_SENAI.map(esc => <option key={esc} value={esc}>{esc}</option>)}
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
-                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          value={formData.um} onChange={e => setFormData({...formData, um: e.target.value})}>
-                          <option value="">Selecione...</option>
+                      </select>
+                      <select className="flex-1 min-w-[140px] p-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" value={dashUM} onChange={e => setDashUM(e.target.value)}>
+                          <option value="">Todas as Unidades</option>
                           {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
-                        </select>
-                        <p className="text-xs text-slate-500 mt-1">Área tecnológica vinculada automaticamente.</p>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Município de Destino</label>
-                        <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.municipio} onChange={e => setFormData({...formData, municipio: e.target.value})} placeholder="Digite a cidade" />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
-                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Término</label>
-                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.fim} onChange={e => setFormData({...formData, fim: e.target.value})} />
-                      </div>
+                      </select>
+                  </div>
+                </div>
 
-                      <div className="col-span-1 sm:col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                          <p className="text-sm font-medium text-slate-700">Status Gerado pelo Sistema:</p>
-                          <p className="text-lg font-bold" style={{color: STATUS_COLORS[autoStatusPreview]}}>{autoStatusPreview}</p>
-                          <p className="text-xs text-slate-500">Calculado com base na data de hoje ({new Date().toLocaleDateString('pt-BR')}) vs. período selecionado.</p>
-                      </div>
+                {/* KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+                    <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><i className="fa-solid fa-truck text-2xl"></i></div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-medium">U.Ms em Operação</p>
+                      <p className="text-2xl font-bold text-slate-800">{activeUMs} <span className="text-sm font-normal text-slate-400">/ {FROTA_DATA.length}</span></p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+                    <div className="p-3 bg-emerald-100 text-emerald-700 rounded-lg"><i className="fa-solid fa-users text-2xl"></i></div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-medium">Total Matrículas</p>
+                      <p className="text-2xl font-bold text-slate-800">{dashKpis.matriculas.toLocaleString('pt-BR')}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+                    <div className="p-3 bg-amber-100 text-amber-700 rounded-lg"><i className="fa-solid fa-clock text-2xl"></i></div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-medium">Carga Horária (h)</p>
+                      <p className="text-2xl font-bold text-slate-800">{dashKpis.cargaHoraria.toLocaleString('pt-BR')}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+                    <div className="p-3 bg-indigo-100 text-indigo-700 rounded-lg"><i className="fa-solid fa-dollar-sign text-2xl px-1"></i></div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-medium">Receita Estimada</p>
+                      <p className="text-2xl font-bold text-slate-800">{formatCurrency(dashKpis.receita)}</p>
+                    </div>
+                  </div>
+                </div>
 
-                      <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2">
-                        <h4 className="text-sm font-semibold text-slate-800 mb-4">Indicadores de Desempenho</h4>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Previsão de Matrículas</label>
-                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.matriculas} onChange={e => setFormData({...formData, matriculas: e.target.value})} />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Total (h)</label>
-                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.cargaHoraria} onChange={e => setFormData({...formData, cargaHoraria: e.target.value})} />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Receita Estimada (R$)</label>
-                        <input type="number" min="0" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.receita} onChange={e => setFormData({...formData, receita: e.target.value})} />
-                      </div>
+                {/* Graficos (2 colunas) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Gráfico 1 */}
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-file-contract mr-2 text-slate-500"></i> Valor dos Contratos por U.M.</h3>
+                    <p className="text-xs text-slate-500 mb-4">Receita estimada gerada por cada unidade móvel.</p>
+                    <div className="flex-1 w-full min-h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartDataUM} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="name" tick={{fontSize: 11}} interval={0} angle={-35} textAnchor="end" height={60} />
+                          <YAxis tick={{fontSize: 12}} tickFormatter={(value) => `R$ ${value/1000}k`} />
+                          <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                          <Bar dataKey="receita" fill="#0284c7" radius={[4, 4, 0, 0]}>
+                            <LabelList dataKey="receita" position="top" formatter={(val) => `R$ ${(val/1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})}k`} fill="#475569" fontSize={11} fontWeight={600} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
-                      {isAdmin && (
-                          <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2 bg-amber-50 p-4 rounded-xl border border-amber-200">
-                            <h4 className="text-sm font-bold text-amber-800 mb-3"><i className="fa-solid fa-lock mr-2"></i> Controles Exclusivos CMOV</h4>
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-medium text-amber-900 mb-1">Sobrescrever Status</label>
-                                    <select className="w-full p-2 border border-amber-300 rounded-lg bg-white text-sm"
-                                    value={formData.statusOverride} onChange={e => setFormData({...formData, statusOverride: e.target.value})}>
-                                    <option value="">Automático</option>
-                                    <option value="Manutenção">Forçar: Manutenção / Indisponível</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-center flex-1 mt-4 sm:mt-0">
-                                    <label className="flex items-center cursor-pointer">
-                                    <input type="checkbox" className="sr-only peer" checked={formData.impactoSocial} onChange={e => setFormData({...formData, impactoSocial: e.target.checked})} />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                                    <span className="ml-3 text-sm font-medium text-amber-900">Ação de Impacto Social / Gratuita</span>
-                                    </label>
-                                </div>
-                            </div>
-                          </div>
-                      )}
-                    </form>
+                  {/* Gráfico 2 */}
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-chart-pie mr-2 text-slate-500"></i> Status da Frota</h3>
+                    <p className="text-xs text-slate-500 mb-4">Detalhamento de volume e valores retidos em cada status.</p>
+                    <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                          <Pie
+                            data={chartDataStatus}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={95}
+                            paddingAngle={5}
+                            dataKey="value"
+                            labelLine={true}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          >
+                            {chartDataStatus.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip content={<CustomTooltip />} />
+                          <Legend verticalAlign="bottom" height={36}/>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                   
-                  <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors">
-                      Cancelar
-                    </button>
-                    <button type="submit" form="reserva-form" className="px-5 py-2.5 bg-[#005CAA] text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors shadow-sm flex items-center">
-                      <i className="fa-solid fa-check mr-2"></i> Salvar {editingItem ? 'Alterações' : 'Reserva'}
-                    </button>
+                  {/* Gráfico 3 */}
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-layer-group mr-2 text-slate-500"></i> Atendimentos por Área</h3>
+                    <p className="text-xs text-slate-500 mb-4">Volume de contratos fechados por segmento de atuação.</p>
+                    <div className="w-full h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartDataArea} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="name" tick={{fontSize: 12}} interval={0} angle={-30} textAnchor="end" height={60} />
+                          <YAxis tick={{fontSize: 12}} />
+                          <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                          <Bar dataKey="Atendimentos" fill="#10b981" radius={[4, 4, 0, 0]} name="Atendimentos">
+                            <LabelList dataKey="Atendimentos" position="top" fill="#475569" fontSize={12} fontWeight={600} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
+
+                  {/* Gráfico 4 - Novo Gráfico de Cliente/Escola */}
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-handshake mr-2 text-slate-500"></i> Receita por Cliente / Escola</h3>
+                    <p className="text-xs text-slate-500 mb-4">Ranqueamento de volume financeiro de propostas por cliente.</p>
+                    <div className="w-full overflow-y-auto pr-2" style={{ height: '288px' }}>
+                      <div style={{ height: `${Math.max(288, chartDataCliente.length * 60)}px` }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartDataCliente} layout="vertical" margin={{ top: 10, right: 50, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                              <XAxis type="number" tick={{fontSize: 12}} tickFormatter={(value) => `R$ ${value/1000}k`} />
+                              <YAxis type="category" dataKey="name" tick={{fontSize: 11}} width={140} interval={0} />
+                              <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                              <Bar dataKey="receita" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Receita (R$)" barSize={25}>
+                                  <LabelList dataKey="receita" position="right" formatter={(val) => `R$ ${(val/1000).toFixed(1)}k`} fill="#475569" fontSize={11} fontWeight={600} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             );
           };
 
-          const openNewModal = () => window.dispatchEvent(new CustomEvent('openModalCadastro'));
-          const openEditModal = (item) => window.dispatchEvent(new CustomEvent('openModalCadastro', { detail: { item } }));
-
-          const ReservasView = () => {
-            // Filtros de Coluna Específicos
-            const [filterUM, setFilterUM] = useState('');
-            const [filterEscola, setFilterEscola] = useState('');
-            const [filterInicio, setFilterInicio] = useState('');
-            const [filterFim, setFilterFim] = useState('');
-            const [filterStatus, setFilterStatus] = useState('');
-
-            // Aplica tanto a busca global quanto os filtros de coluna específicos
+          const renderReservas = () => {
             const filteredAtendimentosLocal = atendimentos.filter(a => {
-                // Filtro Global
                 const matchesGlobal = (a.um || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                       (a.escola || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                       (a.municipio || '').toLowerCase().includes(searchTerm.toLowerCase());
-                
-                // Filtros de Colunas
-                const matchesUM = filterUM === '' || a.um === filterUM;
-                const matchesStatus = filterStatus === '' || a.status === filterStatus;
-                const matchesEscola = filterEscola === '' || 
-                                      (a.escola || '').toLowerCase().includes(filterEscola.toLowerCase()) || 
-                                      (a.municipio || '').toLowerCase().includes(filterEscola.toLowerCase());
-                const matchesInicio = filterInicio === '' || a.inicio === filterInicio;
-                const matchesFim = filterFim === '' || a.fim === filterFim;
+                const matchesUM = resFilterUM === '' || a.um === resFilterUM;
+                const matchesStatus = resFilterStatus === '' || a.status === resFilterStatus;
+                const matchesEscola = resFilterEscola === '' || 
+                                      (a.escola || '').toLowerCase().includes(resFilterEscola.toLowerCase()) || 
+                                      (a.municipio || '').toLowerCase().includes(resFilterEscola.toLowerCase());
+                const matchesInicio = resFilterInicio === '' || a.inicio === resFilterInicio;
+                const matchesFim = resFilterFim === '' || a.fim === resFilterFim;
 
                 return matchesGlobal && matchesUM && matchesStatus && matchesEscola && matchesInicio && matchesFim;
             });
@@ -513,7 +468,7 @@
                     />
                   </div>
                   <div className="flex space-x-2 w-full sm:w-auto">
-                    <button onClick={openNewModal} className="flex items-center justify-center px-4 py-2 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-red-700 w-full sm:w-auto shadow-sm transition-colors">
+                    <button onClick={() => window.dispatchEvent(new CustomEvent('openModalCadastro'))} className="flex items-center justify-center px-4 py-2 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-red-700 w-full sm:w-auto shadow-sm transition-colors">
                       <i className="fa-solid fa-plus mr-2"></i> Nova Reserva
                     </button>
                   </div>
@@ -525,38 +480,35 @@
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
                         <th className="p-3 font-semibold">Unidade Móvel</th>
                         <th className="p-3 font-semibold">Escola/Município</th>
-                        <th className="p-3 font-semibold">Início</th>
-                        <th className="p-3 font-semibold">Término</th>
+                        <th className="p-3 font-semibold min-w-[120px]">Início</th>
+                        <th className="p-3 font-semibold min-w-[120px]">Término</th>
                         <th className="p-3 font-semibold">Status</th>
                         <th className="p-3 font-semibold">Matr. / Horas</th>
                         <th className="p-3 font-semibold text-center">Ações</th>
                       </tr>
-                      {/* Sub-Header para os Filtros Específicos das Colunas */}
                       <tr className="bg-slate-100 border-b border-slate-200">
                         <th className="p-2">
-                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterUM} onChange={e => setFilterUM(e.target.value)}>
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={resFilterUM} onChange={e => setResFilterUM(e.target.value)}>
                                 <option value="">Todas Unidades</option>
                                 {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
                             </select>
                         </th>
                         <th className="p-2">
-                            <input type="text" placeholder="Filtrar Escola/Cidade" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterEscola} onChange={e => setFilterEscola(e.target.value)} />
+                            <input type="text" placeholder="Filtrar Cliente" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={resFilterEscola} onChange={e => setResFilterEscola(e.target.value)} />
                         </th>
                         <th className="p-2">
-                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterInicio} onChange={e => setFilterInicio(e.target.value)} />
+                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={resFilterInicio} onChange={e => setResFilterInicio(e.target.value)} />
                         </th>
                         <th className="p-2">
-                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterFim} onChange={e => setFilterFim(e.target.value)} />
+                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={resFilterFim} onChange={e => setResFilterFim(e.target.value)} />
                         </th>
                         <th className="p-2">
-                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={resFilterStatus} onChange={e => setResFilterStatus(e.target.value)}>
                                 <option value="">Todos Status</option>
                                 {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </th>
-                        <th className="p-2 text-xs text-center text-slate-400 font-normal italic">
-                            Sem filtro
-                        </th>
+                        <th className="p-2 text-xs text-center text-slate-400 font-normal italic">Sem filtro</th>
                         <th className="p-2"></th>
                       </tr>
                     </thead>
@@ -571,18 +523,10 @@
                             <p className="text-slate-800">{item.escola}</p>
                             <p className="text-xs text-slate-500 flex items-center mt-0.5"><i className="fa-solid fa-location-dot text-xs mr-1"></i> {item.municipio}</p>
                           </td>
-                          <td className="p-4 whitespace-nowrap">
-                            <p className="text-slate-800">{formatDate(item.inicio)}</p>
-                          </td>
-                          <td className="p-4 whitespace-nowrap">
-                            <p className="text-slate-800">{formatDate(item.fim)}</p>
-                          </td>
+                          <td className="p-4 whitespace-nowrap"><p className="text-slate-800">{formatDate(item.inicio)}</p></td>
+                          <td className="p-4 whitespace-nowrap"><p className="text-slate-800">{formatDate(item.fim)}</p></td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border" style={{
-                              backgroundColor: `${STATUS_COLORS[item.status]}15`,
-                              color: STATUS_COLORS[item.status],
-                              borderColor: `${STATUS_COLORS[item.status]}30`
-                            }}>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border" style={{ backgroundColor: `${STATUS_COLORS[item.status]}15`, color: STATUS_COLORS[item.status], borderColor: `${STATUS_COLORS[item.status]}30` }}>
                               {item.status}
                             </span>
                           </td>
@@ -592,7 +536,7 @@
                           </td>
                           <td className="p-4 text-center">
                             <div className="flex justify-center space-x-2">
-                               <button onClick={() => openEditModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                               <button onClick={() => window.dispatchEvent(new CustomEvent('openModalCadastro', { detail: { item } }))} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
                                  <i className="fa-solid fa-pen"></i>
                                </button>
                                {isAdmin && (
@@ -608,7 +552,7 @@
                         <tr>
                           <td colSpan="7" className="p-8 text-center text-slate-500">
                             <i className="fa-solid fa-file-excel text-5xl text-slate-300 mb-3 block mx-auto"></i>
-                            Nenhum atendimento encontrado para os filtros selecionados.
+                            Nenhum atendimento encontrado para os filtros.
                           </td>
                         </tr>
                       )}
@@ -619,20 +563,16 @@
             );
           };
 
-          const GanttView = () => {
-            const [ganttFilterUM, setGanttFilterUM] = useState('');
-            const [ganttFilterStatus, setGanttFilterStatus] = useState('');
-            const [ganttStartDate, setGanttStartDate] = useState('2026-06-01');
-
+          const renderGantt = () => {
             const filteredUMs = ganttFilterUM ? FROTA_DATA.filter(u => u.cod === ganttFilterUM) : FROTA_DATA;
             const filteredGanttAtendimentos = atendimentos.filter(a => {
               if (ganttFilterStatus && a.status !== ganttFilterStatus) return false;
               return true;
             });
 
+            // Gerando horizonte de 6 meses
             const timelineStart = new Date(`${ganttStartDate}T00:00:00`); 
             const months = [];
-            // Alterado de 4 para 6 meses de visualização
             for(let i=0; i<6; i++) {
               let d = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + i, 1);
               months.push({ name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(), year: d.getFullYear(), days: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() });
@@ -676,8 +616,7 @@
                     ))}
                   </div>
 
-                  {/* Alterada a largura mínima de 800px para 1000px para acomodar os 6 meses confortavelmente */}
-                  <div className="flex-1 min-w-[1000px] relative">
+                  <div className="flex-1 min-w-[900px] relative">
                     {isTodayInView && (
                       <div className="absolute top-0 bottom-0 border-l-2 border-[#ED1C24] border-dashed z-20 pointer-events-none flex flex-col items-center" style={{ left: `${todayLeftPercent}%` }}>
                         <div className="bg-[#ED1C24] text-white text-[10px] px-2 py-0.5 rounded-b font-bold shadow-sm whitespace-nowrap -translate-x-1/2 mt-0">Hoje</div>
@@ -720,7 +659,7 @@
                                   className="absolute top-3 h-10 rounded-md shadow-sm flex items-center px-2 text-white text-xs truncate cursor-pointer transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden"
                                   style={{ left: `${Math.max(0, leftPercent)}%`, width: `${widthPercent}%`, backgroundColor: STATUS_COLORS[atend.status] }}
                                   title={`Cliente: ${atend.escola}\nPeríodo: ${formatDate(atend.inicio)} a ${formatDate(atend.fim)}\nStatus: ${atend.status}`}
-                                  onClick={() => openEditModal(atend)}
+                                  onClick={() => window.dispatchEvent(new CustomEvent('openModalCadastro', { detail: { item: atend } }))}
                                 >
                                   <span className="truncate w-full drop-shadow-sm font-medium pl-1">{atend.escola}</span>
                                 </div>
@@ -736,23 +675,12 @@
             );
           };
 
-          const FrotaView = () => {
-            // Filtros da Tabela de Frota
-            const [filterCod, setFilterCod] = useState('');
-            const [filterOrigem, setFilterOrigem] = useState('');
-            const [filterStatus, setFilterStatus] = useState('');
-            const [filterCat, setFilterCat] = useState('');
-
+          const renderFrota = () => {
             const filteredFrotaLocal = FROTA_DATA.filter(item => {
-                const matchesCod = filterCod === '' || item.cod.toLowerCase().includes(filterCod.toLowerCase());
-                const matchesOrigem = filterOrigem === '' || 
-                                      item.unidade.toLowerCase().includes(filterOrigem.toLowerCase()) || 
-                                      item.origem.toLowerCase().includes(filterOrigem.toLowerCase());
-                const matchesStatus = filterStatus === '' || item.status === filterStatus;
-                const matchesCat = filterCat === '' || 
-                                   item.placa.toLowerCase().includes(filterCat.toLowerCase()) || 
-                                   item.categoria.toLowerCase().includes(filterCat.toLowerCase());
-                
+                const matchesCod = frotaFilterCod === '' || item.cod.toLowerCase().includes(frotaFilterCod.toLowerCase());
+                const matchesOrigem = frotaFilterOrigem === '' || item.unidade.toLowerCase().includes(frotaFilterOrigem.toLowerCase()) || item.origem.toLowerCase().includes(frotaFilterOrigem.toLowerCase());
+                const matchesStatus = frotaFilterStatus === '' || item.status === frotaFilterStatus;
+                const matchesCat = frotaFilterCat === '' || item.placa.toLowerCase().includes(frotaFilterCat.toLowerCase()) || item.categoria.toLowerCase().includes(frotaFilterCat.toLowerCase());
                 return matchesCod && matchesOrigem && matchesStatus && matchesCat;
             });
 
@@ -774,25 +702,18 @@
                         <th className="p-3 font-semibold text-center">Tempo (Anos)</th>
                         <th className="p-3 font-semibold text-center">Ar Cond.</th>
                       </tr>
-                      {/* Sub-Header para os Filtros da Frota */}
                       <tr className="bg-slate-100 border-b border-slate-200">
+                        <th className="p-2"><input type="text" placeholder="Filtrar Cód..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700" value={frotaFilterCod} onChange={e => setFrotaFilterCod(e.target.value)} /></th>
+                        <th className="p-2"><input type="text" placeholder="Filtrar Origem..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700" value={frotaFilterOrigem} onChange={e => setFrotaFilterOrigem(e.target.value)} /></th>
                         <th className="p-2">
-                            <input type="text" placeholder="Filtrar Cód..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterCod} onChange={e => setFilterCod(e.target.value)} />
-                        </th>
-                        <th className="p-2">
-                            <input type="text" placeholder="Filtrar Origem..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterOrigem} onChange={e => setFilterOrigem(e.target.value)} />
-                        </th>
-                        <th className="p-2">
-                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700" value={frotaFilterStatus} onChange={e => setFrotaFilterStatus(e.target.value)}>
                                 <option value="">Todos Status</option>
                                 <option value="OPERACIONAL">OPERACIONAL</option>
                                 <option value="REFORMA">REFORMA</option>
                                 <option value="MANUTENÇÃO">MANUTENÇÃO</option>
                             </select>
                         </th>
-                        <th className="p-2">
-                            <input type="text" placeholder="Filtrar Placa/Cat..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterCat} onChange={e => setFilterCat(e.target.value)} />
-                        </th>
+                        <th className="p-2"><input type="text" placeholder="Filtrar Placa/Cat..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700" value={frotaFilterCat} onChange={e => setFrotaFilterCat(e.target.value)} /></th>
                         <th className="p-2 text-xs text-center text-slate-400 font-normal italic">Sem filtro</th>
                         <th className="p-2 text-xs text-center text-slate-400 font-normal italic">Sem filtro</th>
                       </tr>
@@ -806,11 +727,7 @@
                             <p className="text-xs text-slate-500 uppercase">{frota.origem}</p>
                           </td>
                           <td className="p-3 text-center">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
-                              frota.status === 'OPERACIONAL' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
-                              frota.status === 'REFORMA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
-                              'bg-red-100 text-red-700 border-red-200'
-                            }`}>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${frota.status === 'OPERACIONAL' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : frota.status === 'REFORMA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
                               {frota.status}
                             </span>
                           </td>
@@ -822,14 +739,6 @@
                           <td className="p-3 text-center text-slate-800 font-medium">{frota.ar}</td>
                         </tr>
                       ))}
-                      {filteredFrotaLocal.length === 0 && (
-                        <tr>
-                          <td colSpan="6" className="p-8 text-center text-slate-500">
-                            <i className="fa-solid fa-truck-slash text-5xl text-slate-300 mb-3 block mx-auto"></i>
-                            Nenhuma Unidade da Frota encontrada com estes filtros.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -837,28 +746,20 @@
             );
           };
 
-          const SimulacaoView = () => {
-            const [simUM, setSimUM] = useState('');
-            const [simHoras, setSimHoras] = useState(160);
-            const [simBase, setSimBase] = useState(400); // Valor hora base
-            const [simAdicional, setSimAdicional] = useState(0);
-
-            const simulacao = useMemo(() => {
+          const renderSimulacao = () => {
+            const simulacao = (() => {
               const umObj = FROTA_DATA.find(u => u.cod === simUM);
               const subtotal = Number(simHoras) * Number(simBase);
               const total = subtotal + Number(simAdicional);
-
               return { umObj, subtotal, total };
-            }, [simUM, simHoras, simBase, simAdicional]);
+            })();
 
             const agendarSimulacao = () => {
               window.dispatchEvent(new CustomEvent('openModalCadastro', { 
                   detail: { 
                       prefill: {
                         um: simulacao.umObj ? simulacao.umObj.cod : '',
-                        cargaHoraria: simHoras,
-                        receita: simulacao.total,
-                        matriculas: 0,
+                        cargaHoraria: simHoras, receita: simulacao.total, matriculas: 0,
                         escola: '', municipio: '', inicio: '', fim: '', impactoSocial: false
                       }
                   } 
@@ -873,8 +774,7 @@
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
-                      <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                        value={simUM} onChange={e => setSimUM(e.target.value)}>
+                      <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50" value={simUM} onChange={e => setSimUM(e.target.value)}>
                         <option value="">Selecione uma Unidade da Frota...</option>
                         {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod} ({u.categoria})</option>)}
                       </select>
@@ -882,28 +782,23 @@
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Locada (h)</label>
-                      <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                        value={simHoras} onChange={e => setSimHoras(e.target.value)} />
+                      <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={simHoras} onChange={e => setSimHoras(e.target.value)} />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Valor da Hora (R$ / h)</label>
-                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                        value={simBase} onChange={e => setSimBase(e.target.value)} />
+                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={simBase} onChange={e => setSimBase(e.target.value)} />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Custos Logísticos/Adicionais (R$)</label>
-                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                        value={simAdicional} onChange={e => setSimAdicional(e.target.value)} />
+                      <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" value={simAdicional} onChange={e => setSimAdicional(e.target.value)} />
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-[#002f5c] rounded-xl shadow-lg border border-[#001529] p-6 text-white flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                     <i className="fa-solid fa-file-invoice-dollar text-9xl"></i>
-                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><i className="fa-solid fa-file-invoice-dollar text-9xl"></i></div>
                   <h3 className="text-lg font-bold text-blue-200 mb-4 border-b border-white/10 pb-2 relative z-10">Resumo da Cotação</h3>
                   
                   <div className="flex-1 space-y-4 relative z-10">
@@ -915,16 +810,13 @@
                       <span className="text-blue-100">Logística/Deslocamento:</span>
                       <span className="font-medium text-emerald-300">+{formatCurrency(simAdicional)}</span>
                     </div>
-                    
                     <div className="pt-2">
                       <p className="text-xs text-blue-300 uppercase tracking-wider mb-1">Preço Final Estimado</p>
                       <p className="text-3xl font-black text-white">{formatCurrency(simulacao.total)}</p>
                     </div>
                   </div>
 
-                  <button 
-                    onClick={agendarSimulacao}
-                    className="w-full mt-6 bg-[#ED1C24] hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex justify-center items-center relative z-10">
+                  <button onClick={agendarSimulacao} className="w-full mt-6 bg-[#ED1C24] hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex justify-center items-center relative z-10">
                     <i className="fa-solid fa-calendar-check mr-2"></i> Converter em Reserva
                   </button>
                 </div>
@@ -932,10 +824,160 @@
             );
           };
 
+          const handleSaveForm = (e) => {
+              e.preventDefault();
+              const umData = FROTA_DATA.find(u => u.cod === formData.um);
+              const area = umData ? umData.area : 'Indefinida';
+              const finalStatus = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
+              const finalData = { ...formData, area: area, status: finalStatus };
+
+              setAtendimentos(prev => {
+                if (editingItem) return prev.map(a => a.id === editingItem ? { ...finalData, id: editingItem } : a);
+                return [...prev, { ...finalData, id: Date.now() }];
+              });
+              recordUpdate();
+              setIsModalOpen(false);
+          };
+
           const executeDelete = () => {
             setAtendimentos(prev => prev.filter(a => a.id !== deleteConfirmId));
             setDeleteConfirmId(null);
             recordUpdate();
+          };
+
+          const autoStatusPreview = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
+
+          // Component Modal Interno
+          const ModalCadastro = () => {
+              useEffect(() => {
+                  const handleOpen = (e) => {
+                      if (e.detail && e.detail.item) {
+                          setEditingItem(e.detail.item.id);
+                          setFormData({ ...e.detail.item, statusOverride: e.detail.item.status === 'Manutenção' ? 'Manutenção' : '' });
+                      } else if (e.detail && e.detail.prefill) {
+                          setEditingItem(null);
+                          setFormData({ ...e.detail.prefill, statusOverride: '' });
+                      } else {
+                          setEditingItem(null);
+                          setFormData({ um: '', escola: '', municipio: '', inicio: '', fim: '', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: '' });
+                      }
+                      setIsModalOpen(true);
+                  };
+                  window.addEventListener('openModalCadastro', handleOpen);
+                  return () => window.removeEventListener('openModalCadastro', handleOpen);
+              }, []);
+
+              if (!isModalOpen) return null;
+
+              return (
+                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                        {editingItem ? <i className="fa-solid fa-pen mr-2 text-blue-600"></i> : <i className="fa-solid fa-plus mr-2 text-[#ED1C24]"></i>}
+                        {editingItem ? 'Editar Atendimento' : 'Nova Solicitação de U.Móvel'}
+                      </h2>
+                      <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition">
+                        <i className="fa-solid fa-xmark text-xl"></i>
+                      </button>
+                    </div>
+                    
+                    <div className="p-6 overflow-y-auto flex-1">
+                      <form id="reserva-form" onSubmit={handleSaveForm} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div className="col-span-1 sm:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Escola Solicitante / Cliente</label>
+                          <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                            value={formData.escola} onChange={e => setFormData({...formData, escola: e.target.value})}>
+                            <option value="">Selecione a Escola...</option>
+                            {ESCOLAS_SENAI.map(esc => <option key={esc} value={esc}>{esc}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
+                          <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={formData.um} onChange={e => setFormData({...formData, um: e.target.value})}>
+                            <option value="">Selecione...</option>
+                            {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
+                          </select>
+                          <p className="text-xs text-slate-500 mt-1">Área tecnológica vinculada automaticamente.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Município de Destino</label>
+                          <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.municipio} onChange={e => setFormData({...formData, municipio: e.target.value})} placeholder="Digite a cidade" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
+                          <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Data de Término</label>
+                          <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.fim} onChange={e => setFormData({...formData, fim: e.target.value})} />
+                        </div>
+
+                        <div className="col-span-1 sm:col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <p className="text-sm font-medium text-slate-700">Status Gerado pelo Sistema:</p>
+                            <p className="text-lg font-bold" style={{color: STATUS_COLORS[autoStatusPreview]}}>{autoStatusPreview}</p>
+                            <p className="text-xs text-slate-500">Calculado com base na data de hoje ({new Date().toLocaleDateString('pt-BR')}) vs. período selecionado.</p>
+                        </div>
+
+                        <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2">
+                          <h4 className="text-sm font-semibold text-slate-800 mb-4">Indicadores de Desempenho</h4>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Previsão de Matrículas</label>
+                          <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.matriculas} onChange={e => setFormData({...formData, matriculas: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Total (h)</label>
+                          <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.cargaHoraria} onChange={e => setFormData({...formData, cargaHoraria: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Receita Estimada (R$)</label>
+                          <input type="number" min="0" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                            value={formData.receita} onChange={e => setFormData({...formData, receita: e.target.value})} />
+                        </div>
+
+                        {isAdmin && (
+                            <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                              <h4 className="text-sm font-bold text-amber-800 mb-3"><i className="fa-solid fa-lock mr-2"></i> Controles Exclusivos CMOV</h4>
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                  <div className="flex-1">
+                                      <label className="block text-xs font-medium text-amber-900 mb-1">Sobrescrever Status</label>
+                                      <select className="w-full p-2 border border-amber-300 rounded-lg bg-white text-sm"
+                                      value={formData.statusOverride} onChange={e => setFormData({...formData, statusOverride: e.target.value})}>
+                                      <option value="">Automático</option>
+                                      <option value="Manutenção">Forçar: Manutenção / Indisponível</option>
+                                      </select>
+                                  </div>
+                                  <div className="flex items-center flex-1 mt-4 sm:mt-0">
+                                      <label className="flex items-center cursor-pointer">
+                                      <input type="checkbox" className="sr-only peer" checked={formData.impactoSocial} onChange={e => setFormData({...formData, impactoSocial: e.target.checked})} />
+                                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                                      <span className="ml-3 text-sm font-medium text-amber-900">Ação de Impacto Social / Gratuita</span>
+                                      </label>
+                                  </div>
+                              </div>
+                            </div>
+                        )}
+                      </form>
+                    </div>
+                    
+                    <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3">
+                      <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors">
+                        Cancelar
+                      </button>
+                      <button type="submit" form="reserva-form" className="px-5 py-2.5 bg-[#005CAA] text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors shadow-sm flex items-center">
+                        <i className="fa-solid fa-check mr-2"></i> Salvar {editingItem ? 'Alterações' : 'Reserva'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
           };
 
           return (
@@ -984,6 +1026,22 @@
                   </div>
                 </header>
 
+                {isMobileMenuOpen && (
+                  <div className="absolute top-16 left-0 right-0 bg-[#002f5c] text-white shadow-xl z-20 md:hidden animate-in slide-in-from-top-2 border-b border-[#001529]">
+                    <nav className="flex flex-col p-2 space-y-1">
+                      <button onClick={() => {setView('dashboard'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'dashboard' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-chart-line mr-2"></i> Dashboard</button>
+                      <button onClick={() => {setView('reservas'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'reservas' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calendar-days mr-2"></i> Reservas</button>
+                      <button onClick={() => {setView('gantt'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'gantt' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck mr-2"></i> Gantt Frota</button>
+                      <button onClick={() => {setView('frota'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'frota' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck-fast mr-2"></i> Quadro da Frota</button>
+                      <button onClick={() => {setView('simulacao'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'simulacao' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calculator mr-2"></i> Simulador Contrato</button>
+                      <div className="mt-2 pt-2 border-t border-white/10 px-2 flex items-center justify-between">
+                          <span className="text-xs text-blue-200">Modo CMOV</span>
+                          <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} className="rounded" />
+                      </div>
+                    </nav>
+                  </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
                   <div className="mb-6">
                       <h2 className="text-2xl font-bold text-slate-800">
@@ -997,11 +1055,11 @@
                       {lastUpdated && <div className="mt-2 inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded border border-blue-100"><i className="fa-solid fa-cloud-arrow-down mr-1"></i> Dados locais atualizados em: {lastUpdated}</div>}
                   </div>
 
-                  {view === 'dashboard' && <DashboardView />}
-                  {view === 'reservas' && <ReservasView />}
-                  {view === 'gantt' && <GanttView />}
-                  {view === 'frota' && <FrotaView />}
-                  {view === 'simulacao' && <SimulacaoView />}
+                  {view === 'dashboard' && renderDashboard()}
+                  {view === 'reservas' && renderReservas()}
+                  {view === 'gantt' && renderGantt()}
+                  {view === 'frota' && renderFrota()}
+                  {view === 'simulacao' && renderSimulacao()}
                 </div>
               </main>
               
