@@ -29,22 +29,17 @@
     <div id="root"></div>
 
     <script type="text/babel" data-presets="env" data-plugins="transform-react-jsx">
-        // ATENÇÃO: Sem uso de importações externas. Acessamos o React e Recharts globalmente.
-        const { useState, useMemo, useEffect, useRef } = window.React;
+        const { useState, useMemo, useEffect } = window.React;
         const { 
           BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, Legend, ResponsiveContainer,
           PieChart, Pie, Cell, LabelList
         } = window.Recharts;
 
-        // Dados Iniciais Simulados
-        const INITIAL_DATA = [
-          { id: 1, um: 'UM-01 Confecção', area: 'Vestuário', escola: 'FATEC SENAI Ítalo Bologna', municipio: 'Goiânia', inicio: '2026-06-10', fim: '2026-07-20', status: 'Em Andamento', matriculas: 120, cargaHoraria: 160, receita: 45000, impactoSocial: true },
-          { id: 2, um: 'UM-02 Solda', area: 'Metalmecânica', escola: 'SENAI Vila Canaã', municipio: 'Aparecida de Goiânia', inicio: '2026-06-01', fim: '2026-06-30', status: 'Em Andamento', matriculas: 80, cargaHoraria: 200, receita: 60000, impactoSocial: false },
-          { id: 3, um: 'UM-03 Informática', area: 'TI', escola: 'SENAI Anápolis', municipio: 'Anápolis', inicio: '2026-07-05', fim: '2026-08-15', status: 'Agendado', matriculas: 150, cargaHoraria: 80, receita: 30000, impactoSocial: true },
-          { id: 4, um: 'UM-04 Panificação', area: 'Alimentos', escola: 'SENAI Rio Verde', municipio: 'Rio Verde', inicio: '2026-05-15', fim: '2026-06-15', status: 'Concluído', matriculas: 90, cargaHoraria: 120, receita: 40000, impactoSocial: false },
-          { id: 5, um: 'UM-05 Eletroeletrônica', area: 'Eletroeletrônica', escola: 'SENAI Catalão', municipio: 'Catalão', inicio: '2026-06-25', fim: '2026-07-05', status: 'Manutenção', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false },
-          { id: 6, um: 'UM-06 Automotiva', area: 'Automotiva', escola: 'SENAI Itumbiara', municipio: 'Itumbiara', inicio: '2026-08-01', fim: '2026-09-30', status: 'Agendado', matriculas: 60, cargaHoraria: 240, receita: 80000, impactoSocial: false },
-          { id: 7, um: 'UM-01 Confecção', area: 'Vestuário', escola: 'SENAI Trindade', municipio: 'Trindade', inicio: '2026-08-01', fim: '2026-09-15', status: 'Agendado', matriculas: 100, cargaHoraria: 160, receita: 40000, impactoSocial: true },
+        // Constants and Data
+        const ESCOLAS_SENAI = [
+            "FATEC SENAI Ítalo Bologna", "SENAI Vila Canaã", "SENAI Anápolis", 
+            "SENAI Rio Verde", "SENAI Catalão", "SENAI Itumbiara", "SENAI Trindade",
+            "SENAI Aparecida de Goiânia", "SENAI Niquelândia", "SENAI Minaçu", "SENAI Quirinópolis"
         ];
 
         const STATUS_COLORS = {
@@ -54,74 +49,90 @@
           'Manutenção': '#ef4444', 
         };
 
-        const AREAS = ['Vestuário', 'Metalmecânica', 'TI', 'Alimentos', 'Eletroeletrônica', 'Automotiva', 'Construção Civil'];
-        const UMS = ['UM-01 Confecção', 'UM-02 Solda', 'UM-03 Informática', 'UM-04 Panificação', 'UM-05 Eletroeletrônica', 'UM-06 Automotiva', 'UM-07 Indústria 4.0'];
-
         const FROTA_DATA = [
-          { cod: 'U.M. Soldagem', unidade: 'SOLDAGEM', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JFP-8605', categoria: 'CARRETA', tempo: 11, ar: 2 },
-          { cod: 'U.M. Panificação', unidade: 'PANIFICAÇÃO', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JKF-9711', categoria: 'CARRETA', tempo: 11, ar: 4 },
-          { cod: 'U.M. Panificação Básica', unidade: 'MULTIFUNCIONAL 5 - CARRETA E', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBX-5501', categoria: 'CARRETA', tempo: 39, ar: 2 },
-          { cod: 'U.M. Refrigeração', unidade: 'MULTIFUNCIONAL 4 - CARRETA D', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBZ-4221', categoria: 'CARRETA', tempo: 41, ar: 2 },
-          { cod: 'U.M. Instalações Elétricas', unidade: 'MULTIFUNCIONAL 3 - CARRETA C', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KBZ-4611', categoria: 'CARRETA', tempo: 41, ar: 2 },
-          { cod: 'U.M. Mecânica Diesel', unidade: 'MULTIFUNCIONAL 6 - CARRETA F', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KCG-5255', categoria: 'CARRETA', tempo: 41, ar: 2 },
-          { cod: 'U.M. Mec. Motocicletas', unidade: 'MULTIFUNCIONAL 7 - CARRETA G', origem: 'SENAI GO', status: 'REFORMA', placa: 'KDL-3081', categoria: 'CARRETA', tempo: 25, ar: 2 },
-          { cod: 'U.M. - Módulo ESCOLA MÓVEL', unidade: 'ESCOLA MÓVEL - CONTÊINERS', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'ND', categoria: 'CONTEINERS', tempo: 2024, ar: 5 },
-          { cod: 'U.M. Educon SESI', unidade: 'Multifuncional SESI EDUCON', origem: 'SESI GO', status: 'OPERACIONAL', placa: 'OGU-2707', categoria: 'CAMINHÃO', tempo: 12, ar: 2 },
-          { cod: 'CAVALO MECÂNICO', unidade: 'CAMINHÃO VW 19.330 ADVANTECH', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'OMW-0073', categoria: 'CAVALO MEC.', tempo: 10, ar: 0 },
-          { cod: 'U.M. Mecânica Industrial', unidade: 'MANUTENÇÃO INDUSTRIAL', origem: 'BNDS', status: 'OPERACIONAL', placa: 'OZW-6455', categoria: 'CARRETA', tempo: 9, ar: 4 },
-          { cod: 'U.M. Manut. Máquinas Agrícolas', unidade: 'MANUT. MÁQUINAS AGRÍCOLAS', origem: 'BNDS', status: 'MANUTENÇÃO', placa: 'PAC-9658', categoria: 'CARRETA', tempo: 9, ar: 4 },
-          { cod: 'U.M. Multi 2 - simples', unidade: 'MULTIFUNCIONAL 1 - CARRETA A', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK0J77', categoria: 'CARRETA', tempo: 2024, ar: 2 },
-          { cod: 'U.M. Multi 1 - com avanço', unidade: 'MULTIFUNCIONAL 2 - CARRETA B', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK1A17', categoria: 'CARRETA', tempo: 2024, ar: 4 }
+          { cod: 'Soldagem', unidade: 'SOLDAGEM', area: 'Metalmecânica', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JFP-8605', categoria: 'CARRETA', tempo: 11, ar: 2 },
+          { cod: 'Panificação', unidade: 'PANIFICAÇÃO', area: 'Alimentos', origem: 'BNDS', status: 'OPERACIONAL', placa: 'JKF-9711', categoria: 'CARRETA', tempo: 11, ar: 4 },
+          { cod: 'Panificação Básica', unidade: 'MULTIFUNCIONAL 5 - CARRETA E', area: 'Alimentos', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBX-5501', categoria: 'CARRETA', tempo: 39, ar: 2 },
+          { cod: 'Refrigeração', unidade: 'MULTIFUNCIONAL 4 - CARRETA D', area: 'Refrigeração', origem: 'SENAI GO', status: 'REFORMA', placa: 'KBZ-4221', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'Instalações Elétricas', unidade: 'MULTIFUNCIONAL 3 - CARRETA C', area: 'Eletroeletrônica', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KBZ-4611', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'Mecânica Diesel', unidade: 'MULTIFUNCIONAL 6 - CARRETA F', area: 'Automotiva', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'KCG-5255', categoria: 'CARRETA', tempo: 41, ar: 2 },
+          { cod: 'Mec. Motocicletas', unidade: 'MULTIFUNCIONAL 7 - CARRETA G', area: 'Automotiva', origem: 'SENAI GO', status: 'REFORMA', placa: 'KDL-3081', categoria: 'CARRETA', tempo: 25, ar: 2 },
+          { cod: 'Módulo ESCOLA MÓVEL', unidade: 'ESCOLA MÓVEL - CONTÊINERS', area: 'Multidisciplinar', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'ND', categoria: 'CONTEINERS', tempo: 2024, ar: 5 },
+          { cod: 'Educon SESI', unidade: 'Multifuncional SESI EDUCON', area: 'Educação Básica', origem: 'SESI GO', status: 'OPERACIONAL', placa: 'OGU-2707', categoria: 'CAMINHÃO', tempo: 12, ar: 2 },
+          { cod: 'CAVALO MECÂNICO', unidade: 'CAMINHÃO VW 19.330 ADVANTECH', area: 'Logística', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'OMW-0073', categoria: 'CAVALO MEC.', tempo: 10, ar: 0 },
+          { cod: 'Mecânica Industrial', unidade: 'MANUTENÇÃO INDUSTRIAL', area: 'Metalmecânica', origem: 'BNDS', status: 'OPERACIONAL', placa: 'OZW-6455', categoria: 'CARRETA', tempo: 9, ar: 4 },
+          { cod: 'Manut. Máquinas Agrícolas', unidade: 'MANUT. MÁQUINAS AGRÍCOLAS', area: 'Mecânica Agrícola', origem: 'BNDS', status: 'MANUTENÇÃO', placa: 'PAC-9658', categoria: 'CARRETA', tempo: 9, ar: 4 },
+          { cod: 'Multi 2 - simples', unidade: 'MULTIFUNCIONAL 1 - CARRETA A', area: 'Multidisciplinar', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK0J77', categoria: 'CARRETA', tempo: 2024, ar: 2 },
+          { cod: 'Multi 1 - com avanço', unidade: 'MULTIFUNCIONAL 2 - CARRETA B', area: 'Multidisciplinar', origem: 'SENAI GO', status: 'OPERACIONAL', placa: 'SDK1A17', categoria: 'CARRETA', tempo: 2024, ar: 4 }
+        ];
+
+        const INITIAL_DATA = [
+          { id: 1, um: 'Soldagem', area: 'Metalmecânica', escola: 'FATEC SENAI Ítalo Bologna', municipio: 'Goiânia', inicio: '2026-06-10', fim: '2026-07-20', status: 'Em Andamento', matriculas: 120, cargaHoraria: 160, receita: 64000, impactoSocial: false },
+          { id: 2, um: 'Panificação', area: 'Alimentos', escola: 'SENAI Vila Canaã', municipio: 'Aparecida de Goiânia', inicio: '2026-06-01', fim: '2026-06-30', status: 'Em Andamento', matriculas: 80, cargaHoraria: 200, receita: 80000, impactoSocial: false },
+          { id: 3, um: 'Módulo ESCOLA MÓVEL', area: 'Multidisciplinar', escola: 'SENAI Anápolis', municipio: 'Anápolis', inicio: '2026-07-05', fim: '2026-08-15', status: 'Agendado', matriculas: 150, cargaHoraria: 80, receita: 32000, impactoSocial: true },
+          { id: 4, um: 'Mecânica Diesel', area: 'Automotiva', escola: 'SENAI Rio Verde', municipio: 'Rio Verde', inicio: '2026-05-15', fim: '2026-06-15', status: 'Concluído', matriculas: 90, cargaHoraria: 120, receita: 48000, impactoSocial: false },
         ];
 
         const MESES_OPCOES = [
-          { value: '2026-01-01', label: 'Janeiro / 2026' },
-          { value: '2026-02-01', label: 'Fevereiro / 2026' },
-          { value: '2026-03-01', label: 'Março / 2026' },
-          { value: '2026-04-01', label: 'Abril / 2026' },
-          { value: '2026-05-01', label: 'Maio / 2026' },
-          { value: '2026-06-01', label: 'Junho / 2026' },
-          { value: '2026-07-01', label: 'Julho / 2026' },
-          { value: '2026-08-01', label: 'Agosto / 2026' },
-          { value: '2026-09-01', label: 'Setembro / 2026' },
-          { value: '2026-10-01', label: 'Outubro / 2026' },
-          { value: '2026-11-01', label: 'Novembro / 2026' },
-          { value: '2026-12-01', label: 'Dezembro / 2026' }
+          { value: '2026-01-01', label: 'Janeiro / 2026' }, { value: '2026-02-01', label: 'Fevereiro / 2026' },
+          { value: '2026-03-01', label: 'Março / 2026' }, { value: '2026-04-01', label: 'Abril / 2026' },
+          { value: '2026-05-01', label: 'Maio / 2026' }, { value: '2026-06-01', label: 'Junho / 2026' },
+          { value: '2026-07-01', label: 'Julho / 2026' }, { value: '2026-08-01', label: 'Agosto / 2026' },
+          { value: '2026-09-01', label: 'Setembro / 2026' }, { value: '2026-10-01', label: 'Outubro / 2026' },
+          { value: '2026-11-01', label: 'Novembro / 2026' }, { value: '2026-12-01', label: 'Dezembro / 2026' }
         ];
 
         const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
         const formatDate = (dateStr) => {
           if (!dateStr) return '';
           const [y, m, d] = dateStr.split('-');
           return `${d}/${m}/${y}`;
         };
-
         const getDaysBetween = (start, end) => {
           const d1 = new Date(start);
           const d2 = new Date(end);
           return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
         };
 
+        const evaluateStatus = (inicio, fim, manualStatus) => {
+            if (manualStatus === 'Manutenção') return 'Manutenção';
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const startDate = new Date(`${inicio}T00:00:00`);
+            const endDate = new Date(`${fim}T00:00:00`);
+
+            if (endDate < today) return 'Concluído';
+            if (startDate <= today && endDate >= today) return 'Em Andamento';
+            return 'Agendado';
+        };
+
         function App() {
           const [view, setView] = useState('dashboard');
+          const [isAdmin, setIsAdmin] = useState(false); // Toggle for CMOV specific views
           
           const [atendimentos, setAtendimentos] = useState(() => {
             try {
               const savedData = localStorage.getItem('sigum_atendimentos');
-              return savedData ? JSON.parse(savedData) : INITIAL_DATA;
+              if (savedData) {
+                  let parsed = JSON.parse(savedData);
+                  // Force status evaluation on load & patch legacy names (Remover 'U.M. ')
+                  return parsed.map(a => {
+                      let cleanedUM = a.um || '';
+                      cleanedUM = cleanedUM.replace(/^U\.M\.\s-\s/, '').replace(/^U\.M\.\s/, '');
+                      return {...a, um: cleanedUM, status: evaluateStatus(a.inicio, a.fim, a.status)};
+                  });
+              }
+              return INITIAL_DATA;
             } catch (e) {
               return INITIAL_DATA;
             }
           });
 
-          const [lastUpdated, setLastUpdated] = useState(() => {
-            try {
-              return localStorage.getItem('sigum_lastUpdated') || null;
-            } catch (e) {
-              return null;
-            }
-          });
+          const [lastUpdated, setLastUpdated] = useState(() => localStorage.getItem('sigum_lastUpdated') || null);
+          const [searchTerm, setSearchTerm] = useState('');
+          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
           useEffect(() => {
             try {
@@ -130,28 +141,10 @@
           }, [atendimentos]);
 
           useEffect(() => {
-            if (lastUpdated) {
-              try {
-                localStorage.setItem('sigum_lastUpdated', lastUpdated);
-              } catch (e) {}
-            }
+            if (lastUpdated) localStorage.setItem('sigum_lastUpdated', lastUpdated);
           }, [lastUpdated]);
 
-          const recordUpdate = () => {
-            setLastUpdated(new Date().toLocaleString('pt-BR'));
-          };
-
-          const [searchTerm, setSearchTerm] = useState('');
-          
-          const [isModalOpen, setIsModalOpen] = useState(false);
-          const [editingItem, setEditingItem] = useState(null);
-          const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-          
-          const [formData, setFormData] = useState({
-            um: '', area: '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false
-          });
-
-          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          const recordUpdate = () => setLastUpdated(new Date().toLocaleString('pt-BR'));
 
           const kpis = useMemo(() => {
             return atendimentos.reduce((acc, curr) => {
@@ -193,7 +186,7 @@
           const chartDataUM = useMemo(() => {
             const data = {};
             atendimentos.forEach(a => {
-              const shortName = a.um.split(' ')[0];
+              const shortName = a.um;
               if (!data[shortName]) data[shortName] = { name: shortName, fullName: a.um, matriculas: 0, receita: 0, Atendimentos: 0 };
               data[shortName].Atendimentos++;
               data[shortName].matriculas += Number(a.matriculas) || 0;
@@ -220,53 +213,6 @@
             return null;
           };
 
-          const handleOpenModal = (item = null) => {
-            if (item && item.id) {
-              setEditingItem(item.id);
-              setFormData({ ...item });
-            } else if (item && !item.id) {
-              setEditingItem(null);
-              setFormData({
-                um: item.um || '', area: item.area || '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: item.matriculas || 0, cargaHoraria: item.cargaHoraria || 0, receita: item.receita || 0, impactoSocial: false
-              });
-            } else {
-              setEditingItem(null);
-              setFormData({
-                um: '', area: '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false
-              });
-            }
-            setIsModalOpen(true);
-          };
-
-          const handleSave = (e) => {
-            e.preventDefault();
-            setAtendimentos(prev => {
-              if (editingItem) {
-                return prev.map(a => a.id === editingItem ? { ...formData, id: editingItem } : a);
-              } else {
-                return [...prev, { ...formData, id: Date.now() }];
-              }
-            });
-            recordUpdate(); // Salva a data exata da modificação
-            setIsModalOpen(false);
-          };
-
-          const confirmDelete = (id) => {
-            setDeleteConfirmId(id);
-          };
-
-          const executeDelete = () => {
-            setAtendimentos(prev => prev.filter(a => a.id !== deleteConfirmId));
-            setDeleteConfirmId(null);
-            recordUpdate(); // Salva a data exata da modificação
-          };
-
-          const filteredAtendimentos = atendimentos.filter(a => 
-            a.um.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            a.escola.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            a.municipio.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-
           const DashboardView = () => (
             <div className="space-y-6 animate-in fade-in duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -274,13 +220,13 @@
                   <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><i className="fa-solid fa-truck text-2xl"></i></div>
                   <div>
                     <p className="text-sm text-slate-500 font-medium">U.Ms em Operação</p>
-                    <p className="text-2xl font-bold text-slate-800">{kpis.ativos} <span className="text-sm font-normal text-slate-400">/ {UMS.length}</span></p>
+                    <p className="text-2xl font-bold text-slate-800">{kpis.ativos} <span className="text-sm font-normal text-slate-400">/ {FROTA_DATA.length}</span></p>
                   </div>
                 </div>
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
                   <div className="p-3 bg-emerald-100 text-emerald-700 rounded-lg"><i className="fa-solid fa-users text-2xl"></i></div>
                   <div>
-                    <p className="text-sm text-slate-500 font-medium">Total Matrículas (Proj.)</p>
+                    <p className="text-sm text-slate-500 font-medium">Total Matrículas</p>
                     <p className="text-2xl font-bold text-slate-800">{kpis.matriculas.toLocaleString('pt-BR')}</p>
                   </div>
                 </div>
@@ -303,7 +249,6 @@
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
                   <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-chart-column mr-2 text-slate-500"></i> Atendimentos por Área</h3>
-                  <p className="text-xs text-slate-500 mb-4">Passe o mouse nas barras para ver receita, matrículas e horas.</p>
                   <div className="flex-1 w-full min-h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartDataArea} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
@@ -321,7 +266,6 @@
 
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
                   <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-chart-pie mr-2 text-slate-500"></i> Status da Frota</h3>
-                  <p className="text-xs text-slate-500 mb-4">Detalhamento de volume e valores retidos em cada status.</p>
                   <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -346,138 +290,350 @@
                     </ResponsiveContainer>
                   </div>
                 </div>
+              </div>
+            </div>
+          );
+
+          const ModalCadastro = () => {
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editingItem, setEditingItem] = useState(null);
+            const [formData, setFormData] = useState({
+              um: '', escola: '', municipio: '', inicio: '', fim: '', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: ''
+            });
+
+            // Listen for custom event to open modal from other components (like Simulacao)
+            useEffect(() => {
+                const handleOpen = (e) => {
+                    if (e.detail && e.detail.item) {
+                        setEditingItem(e.detail.item.id);
+                        setFormData({ ...e.detail.item, statusOverride: e.detail.item.status === 'Manutenção' ? 'Manutenção' : '' });
+                    } else if (e.detail && e.detail.prefill) {
+                        setEditingItem(null);
+                        setFormData({ ...e.detail.prefill, statusOverride: '' });
+                    } else {
+                        setEditingItem(null);
+                        setFormData({ um: '', escola: '', municipio: '', inicio: '', fim: '', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false, statusOverride: '' });
+                    }
+                    setIsModalOpen(true);
+                };
+                window.addEventListener('openModalCadastro', handleOpen);
+                return () => window.removeEventListener('openModalCadastro', handleOpen);
+            }, []);
+
+            if (!isModalOpen) return null;
+
+            const handleSaveForm = (e) => {
+                e.preventDefault();
                 
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><i className="fa-solid fa-truck mr-2 text-slate-500"></i> Desempenho por Unidade Móvel</h3>
-                  <p className="text-xs text-slate-500 mb-4">Visão financeira e de volume de matrículas em cada carreta.</p>
-                  <div className="w-full h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartDataUM} margin={{ top: 20, right: 10, left: 20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="name" tick={{fontSize: 12}} />
-                        <YAxis tick={{fontSize: 12}} tickFormatter={(value) => `R$ ${value/1000}k`} />
-                        <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
-                        <Bar dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} name="Receita (R$)">
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                // Lookup area based on UM
+                const umData = FROTA_DATA.find(u => u.cod === formData.um);
+                const area = umData ? umData.area : 'Indefinida';
+
+                // Determine final status
+                const finalStatus = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
+
+                const finalData = {
+                    ...formData,
+                    area: area,
+                    status: finalStatus
+                };
+
+                setAtendimentos(prev => {
+                  if (editingItem) {
+                    return prev.map(a => a.id === editingItem ? { ...finalData, id: editingItem } : a);
+                  } else {
+                    return [...prev, { ...finalData, id: Date.now() }];
+                  }
+                });
+                recordUpdate();
+                setIsModalOpen(false);
+            };
+
+            const autoStatusPreview = evaluateStatus(formData.inicio, formData.fim, formData.statusOverride);
+
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                      {editingItem ? <i className="fa-solid fa-pen mr-2 text-blue-600"></i> : <i className="fa-solid fa-plus mr-2 text-[#ED1C24]"></i>}
+                      {editingItem ? 'Editar Atendimento' : 'Nova Solicitação de U.Móvel'}
+                    </h2>
+                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition">
+                      <i className="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto flex-1">
+                    <form id="reserva-form" onSubmit={handleSaveForm} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="col-span-1 sm:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Escola Solicitante / Cliente</label>
+                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                          value={formData.escola} onChange={e => setFormData({...formData, escola: e.target.value})}>
+                          <option value="">Selecione a Escola...</option>
+                          {ESCOLAS_SENAI.map(esc => <option key={esc} value={esc}>{esc}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
+                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          value={formData.um} onChange={e => setFormData({...formData, um: e.target.value})}>
+                          <option value="">Selecione...</option>
+                          {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">Área tecnológica vinculada automaticamente.</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Município de Destino</label>
+                        <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.municipio} onChange={e => setFormData({...formData, municipio: e.target.value})} placeholder="Digite a cidade" />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
+                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Término</label>
+                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.fim} onChange={e => setFormData({...formData, fim: e.target.value})} />
+                      </div>
+
+                      <div className="col-span-1 sm:col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                          <p className="text-sm font-medium text-slate-700">Status Gerado pelo Sistema:</p>
+                          <p className="text-lg font-bold" style={{color: STATUS_COLORS[autoStatusPreview]}}>{autoStatusPreview}</p>
+                          <p className="text-xs text-slate-500">Calculado com base na data de hoje ({new Date().toLocaleDateString('pt-BR')}) vs. período selecionado.</p>
+                      </div>
+
+                      <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2">
+                        <h4 className="text-sm font-semibold text-slate-800 mb-4">Indicadores de Desempenho</h4>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Previsão de Matrículas</label>
+                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.matriculas} onChange={e => setFormData({...formData, matriculas: e.target.value})} />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Total (h)</label>
+                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.cargaHoraria} onChange={e => setFormData({...formData, cargaHoraria: e.target.value})} />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Receita Estimada (R$)</label>
+                        <input type="number" min="0" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                          value={formData.receita} onChange={e => setFormData({...formData, receita: e.target.value})} />
+                      </div>
+
+                      {isAdmin && (
+                          <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                            <h4 className="text-sm font-bold text-amber-800 mb-3"><i className="fa-solid fa-lock mr-2"></i> Controles Exclusivos CMOV</h4>
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-amber-900 mb-1">Sobrescrever Status</label>
+                                    <select className="w-full p-2 border border-amber-300 rounded-lg bg-white text-sm"
+                                    value={formData.statusOverride} onChange={e => setFormData({...formData, statusOverride: e.target.value})}>
+                                    <option value="">Automático</option>
+                                    <option value="Manutenção">Forçar: Manutenção / Indisponível</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center flex-1 mt-4 sm:mt-0">
+                                    <label className="flex items-center cursor-pointer">
+                                    <input type="checkbox" className="sr-only peer" checked={formData.impactoSocial} onChange={e => setFormData({...formData, impactoSocial: e.target.checked})} />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                                    <span className="ml-3 text-sm font-medium text-amber-900">Ação de Impacto Social / Gratuita</span>
+                                    </label>
+                                </div>
+                            </div>
+                          </div>
+                      )}
+                    </form>
+                  </div>
+                  
+                  <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors">
+                      Cancelar
+                    </button>
+                    <button type="submit" form="reserva-form" className="px-5 py-2.5 bg-[#005CAA] text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors shadow-sm flex items-center">
+                      <i className="fa-solid fa-check mr-2"></i> Salvar {editingItem ? 'Alterações' : 'Reserva'}
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          );
+            );
+          };
 
-          const ReservasView = () => (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
-              <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="relative w-full sm:w-96">
-                  <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                  <input 
-                    type="text" 
-                    placeholder="Buscar por U.M, Escola ou Município..." 
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+          const openNewModal = () => window.dispatchEvent(new CustomEvent('openModalCadastro'));
+          const openEditModal = (item) => window.dispatchEvent(new CustomEvent('openModalCadastro', { detail: { item } }));
+
+          const ReservasView = () => {
+            // Filtros de Coluna Específicos
+            const [filterUM, setFilterUM] = useState('');
+            const [filterEscola, setFilterEscola] = useState('');
+            const [filterInicio, setFilterInicio] = useState('');
+            const [filterFim, setFilterFim] = useState('');
+            const [filterStatus, setFilterStatus] = useState('');
+
+            // Aplica tanto a busca global quanto os filtros de coluna específicos
+            const filteredAtendimentosLocal = atendimentos.filter(a => {
+                // Filtro Global
+                const matchesGlobal = (a.um || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                      (a.escola || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                      (a.municipio || '').toLowerCase().includes(searchTerm.toLowerCase());
+                
+                // Filtros de Colunas
+                const matchesUM = filterUM === '' || a.um === filterUM;
+                const matchesStatus = filterStatus === '' || a.status === filterStatus;
+                const matchesEscola = filterEscola === '' || 
+                                      (a.escola || '').toLowerCase().includes(filterEscola.toLowerCase()) || 
+                                      (a.municipio || '').toLowerCase().includes(filterEscola.toLowerCase());
+                const matchesInicio = filterInicio === '' || a.inicio === filterInicio;
+                const matchesFim = filterFim === '' || a.fim === filterFim;
+
+                return matchesGlobal && matchesUM && matchesStatus && matchesEscola && matchesInicio && matchesFim;
+            });
+
+            return (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
+                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="relative w-full sm:w-96">
+                    <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input 
+                      type="text" 
+                      placeholder="Pesquisa Global Livre..." 
+                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex space-x-2 w-full sm:w-auto">
+                    <button onClick={openNewModal} className="flex items-center justify-center px-4 py-2 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-red-700 w-full sm:w-auto shadow-sm transition-colors">
+                      <i className="fa-solid fa-plus mr-2"></i> Nova Reserva
+                    </button>
+                  </div>
                 </div>
-                <div className="flex space-x-2 w-full sm:w-auto">
-                  <button className="flex items-center justify-center px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 w-full sm:w-auto transition-colors">
-                    <i className="fa-solid fa-filter mr-2"></i> Filtros
-                  </button>
-                  <button 
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center justify-center px-4 py-2 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-red-700 w-full sm:w-auto shadow-sm transition-colors"
-                  >
-                    <i className="fa-solid fa-plus mr-2"></i> Nova Reserva
-                  </button>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+                        <th className="p-3 font-semibold">Unidade Móvel</th>
+                        <th className="p-3 font-semibold">Escola/Município</th>
+                        <th className="p-3 font-semibold">Início</th>
+                        <th className="p-3 font-semibold">Término</th>
+                        <th className="p-3 font-semibold">Status</th>
+                        <th className="p-3 font-semibold">Matr. / Horas</th>
+                        <th className="p-3 font-semibold text-center">Ações</th>
+                      </tr>
+                      {/* Sub-Header para os Filtros Específicos das Colunas */}
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th className="p-2">
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterUM} onChange={e => setFilterUM(e.target.value)}>
+                                <option value="">Todas Unidades</option>
+                                {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
+                            </select>
+                        </th>
+                        <th className="p-2">
+                            <input type="text" placeholder="Filtrar Escola/Cidade" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterEscola} onChange={e => setFilterEscola(e.target.value)} />
+                        </th>
+                        <th className="p-2">
+                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterInicio} onChange={e => setFilterInicio(e.target.value)} />
+                        </th>
+                        <th className="p-2">
+                            <input type="date" className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterFim} onChange={e => setFilterFim(e.target.value)} />
+                        </th>
+                        <th className="p-2">
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="">Todos Status</option>
+                                {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </th>
+                        <th className="p-2 text-xs text-center text-slate-400 font-normal italic">
+                            Sem filtro
+                        </th>
+                        <th className="p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm divide-y divide-slate-200">
+                      {filteredAtendimentosLocal.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-4">
+                            <p className="font-medium text-slate-800">{item.um}</p>
+                            <p className="text-xs text-slate-500">{item.area}</p>
+                          </td>
+                          <td className="p-4">
+                            <p className="text-slate-800">{item.escola}</p>
+                            <p className="text-xs text-slate-500 flex items-center mt-0.5"><i className="fa-solid fa-location-dot text-xs mr-1"></i> {item.municipio}</p>
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <p className="text-slate-800">{formatDate(item.inicio)}</p>
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <p className="text-slate-800">{formatDate(item.fim)}</p>
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border" style={{
+                              backgroundColor: `${STATUS_COLORS[item.status]}15`,
+                              color: STATUS_COLORS[item.status],
+                              borderColor: `${STATUS_COLORS[item.status]}30`
+                            }}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <p className="text-slate-800">{item.matriculas} alunos</p>
+                            <p className="text-slate-500 text-xs">{item.cargaHoraria}h</p>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="flex justify-center space-x-2">
+                               <button onClick={() => openEditModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                                 <i className="fa-solid fa-pen"></i>
+                               </button>
+                               {isAdmin && (
+                                 <button onClick={() => setDeleteConfirmId(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
+                                   <i className="fa-solid fa-trash"></i>
+                                 </button>
+                               )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredAtendimentosLocal.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-slate-500">
+                            <i className="fa-solid fa-file-excel text-5xl text-slate-300 mb-3 block mx-auto"></i>
+                            Nenhum atendimento encontrado para os filtros selecionados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                      <th className="p-4 font-semibold">Unidade Móvel</th>
-                      <th className="p-4 font-semibold">Escola/Município</th>
-                      <th className="p-4 font-semibold">Período</th>
-                      <th className="p-4 font-semibold">Status</th>
-                      <th className="p-4 font-semibold">Matr. / Horas</th>
-                      <th className="p-4 font-semibold text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm divide-y divide-slate-200">
-                    {filteredAtendimentos.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4">
-                          <p className="font-medium text-slate-800">{item.um}</p>
-                          <p className="text-xs text-slate-500">{item.area}</p>
-                        </td>
-                        <td className="p-4">
-                          <p className="text-slate-800">{item.escola}</p>
-                          <p className="text-xs text-slate-500 flex items-center mt-0.5"><i className="fa-solid fa-location-dot text-xs mr-1"></i> {item.municipio}</p>
-                        </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <p className="text-slate-800">{formatDate(item.inicio)}</p>
-                          <p className="text-slate-500 text-xs">até {formatDate(item.fim)}</p>
-                        </td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border" style={{
-                            backgroundColor: `${STATUS_COLORS[item.status]}15`,
-                            color: STATUS_COLORS[item.status],
-                            borderColor: `${STATUS_COLORS[item.status]}30`
-                          }}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <p className="text-slate-800">{item.matriculas} alunos</p>
-                          <p className="text-slate-500 text-xs">{item.cargaHoraria}h</p>
-                        </td>
-                        <td className="p-4 text-center">
-                          <div className="flex justify-center space-x-2">
-                             <button onClick={() => handleOpenModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
-                               <i className="fa-solid fa-pen"></i>
-                             </button>
-                             <button onClick={() => confirmDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
-                               <i className="fa-solid fa-trash"></i>
-                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredAtendimentos.length === 0 && (
-                      <tr>
-                        <td colSpan="6" className="p-8 text-center text-slate-500">
-                          <i className="fa-solid fa-file-excel text-5xl text-slate-300 mb-3 block mx-auto"></i>
-                          Nenhum atendimento encontrado.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
+            );
+          };
 
           const GanttView = () => {
-            // Estados para os filtros
             const [ganttFilterUM, setGanttFilterUM] = useState('');
             const [ganttFilterStatus, setGanttFilterStatus] = useState('');
             const [ganttStartDate, setGanttStartDate] = useState('2026-06-01');
-            
-            const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-            // Aplicação dos filtros nas unidades e atendimentos
-            const filteredUMs = ganttFilterUM ? UMS.filter(u => u === ganttFilterUM) : UMS;
+            const filteredUMs = ganttFilterUM ? FROTA_DATA.filter(u => u.cod === ganttFilterUM) : FROTA_DATA;
             const filteredGanttAtendimentos = atendimentos.filter(a => {
               if (ganttFilterStatus && a.status !== ganttFilterStatus) return false;
               return true;
             });
 
-            // Geração Dinâmica dos Meses (4 meses a partir da data base selecionada)
             const timelineStart = new Date(`${ganttStartDate}T00:00:00`); 
             const months = [];
-            for(let i=0; i<4; i++) {
+            // Alterado de 4 para 6 meses de visualização
+            for(let i=0; i<6; i++) {
               let d = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + i, 1);
               months.push({ name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(), year: d.getFullYear(), days: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() });
             }
@@ -489,42 +645,24 @@
             const todayLeftPercent = (daysExactToToday / totalDaysTimeline) * 100;
             const isTodayInView = todayLeftPercent >= 0 && todayLeftPercent <= 100;
 
-            const handleMouseMove = (e) => {
-              setTooltipPos({ x: e.clientX, y: e.clientY });
-            };
-
             return (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px] animate-in fade-in duration-500 relative">
-                
-                {/* Cabeçalho do Gantt e Barra de Filtros */}
                 <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                   <div>
                     <h3 className="font-semibold text-slate-800 flex items-center"><i className="fa-solid fa-list-check mr-2 text-blue-600"></i> Mapa de Ocupação (Gantt)</h3>
-                    <p className="text-xs text-slate-500 mt-1">Visão de ocupação num horizonte de 4 meses.</p>
                   </div>
-                  
-                  {/* Filtros Suspensos */}
                   <div className="flex flex-wrap items-center gap-3">
-                    <div>
-                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
-                          value={ganttFilterUM} onChange={e => setGanttFilterUM(e.target.value)}>
-                          <option value="">Todas as Unidades</option>
-                          {UMS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
-                          value={ganttFilterStatus} onChange={e => setGanttFilterStatus(e.target.value)}>
-                          <option value="">Todos os Status</option>
-                          {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-sm"
-                          value={ganttStartDate} onChange={e => setGanttStartDate(e.target.value)}>
-                          {MESES_OPCOES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                    </div>
+                    <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700" value={ganttFilterUM} onChange={e => setGanttFilterUM(e.target.value)}>
+                        <option value="">Todas as Unidades</option>
+                        {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod}</option>)}
+                    </select>
+                    <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700" value={ganttFilterStatus} onChange={e => setGanttFilterStatus(e.target.value)}>
+                        <option value="">Todos os Status</option>
+                        {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <select className="p-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700" value={ganttStartDate} onChange={e => setGanttStartDate(e.target.value)}>
+                        {MESES_OPCOES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
                   </div>
                 </div>
 
@@ -532,18 +670,14 @@
                   <div className="w-48 sm:w-64 border-r border-slate-200 flex-shrink-0 bg-white sticky left-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                     <div className="h-12 border-b border-slate-200 bg-slate-50"></div>
                     {filteredUMs.map((um) => (
-                      <div key={um} className="h-16 flex flex-col justify-center px-4 border-b border-slate-100">
-                        <span className="text-sm font-medium text-slate-800 truncate" title={um}>{um}</span>
+                      <div key={um.cod} className="h-16 flex flex-col justify-center px-4 border-b border-slate-100">
+                        <span className="text-sm font-medium text-slate-800 truncate" title={um.cod}>{um.cod}</span>
                       </div>
                     ))}
-                    {filteredUMs.length === 0 && (
-                      <div className="h-16 flex flex-col justify-center px-4">
-                        <span className="text-xs text-slate-400">Nenhuma unidade encontrada.</span>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="flex-1 min-w-[800px] relative" onMouseMove={handleMouseMove}>
+                  {/* Alterada a largura mínima de 800px para 1000px para acomodar os 6 meses confortavelmente */}
+                  <div className="flex-1 min-w-[1000px] relative">
                     {isTodayInView && (
                       <div className="absolute top-0 bottom-0 border-l-2 border-[#ED1C24] border-dashed z-20 pointer-events-none flex flex-col items-center" style={{ left: `${todayLeftPercent}%` }}>
                         <div className="bg-[#ED1C24] text-white text-[10px] px-2 py-0.5 rounded-b font-bold shadow-sm whitespace-nowrap -translate-x-1/2 mt-0">Hoje</div>
@@ -565,13 +699,12 @@
                       })}
 
                       {filteredUMs.map((um, rowIndex) => {
-                        const umAtendimentos = filteredGanttAtendimentos.filter(a => a.um === um);
+                        const umAtendimentos = filteredGanttAtendimentos.filter(a => a.um === um.cod);
                         return (
                           <div key={rowIndex} className="h-16 border-b border-slate-100 relative group hover:bg-slate-50/50 z-10">
                             {umAtendimentos.map(atend => {
                               const start = new Date(`${atend.inicio}T00:00:00`);
                               const end = new Date(`${atend.fim}T00:00:00`);
-                              
                               if (end.getTime() < timelineStart.getTime()) return null;
 
                               const visualStart = start.getTime() < timelineStart.getTime() ? timelineStart : start;
@@ -587,9 +720,9 @@
                                   className="absolute top-3 h-10 rounded-md shadow-sm flex items-center px-2 text-white text-xs truncate cursor-pointer transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden"
                                   style={{ left: `${Math.max(0, leftPercent)}%`, width: `${widthPercent}%`, backgroundColor: STATUS_COLORS[atend.status] }}
                                   title={`Cliente: ${atend.escola}\nPeríodo: ${formatDate(atend.inicio)} a ${formatDate(atend.fim)}\nStatus: ${atend.status}`}
-                                  onClick={() => handleOpenModal(atend)}
+                                  onClick={() => openEditModal(atend)}
                                 >
-                                  <span className="truncate w-full drop-shadow-sm font-medium">{atend.escola}</span>
+                                  <span className="truncate w-full drop-shadow-sm font-medium pl-1">{atend.escola}</span>
                                 </div>
                               );
                             })}
@@ -603,94 +736,133 @@
             );
           };
 
-          const FrotaView = () => (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
-              <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <div>
-                  <h3 className="font-semibold text-slate-800">Quadro de Status da Frota</h3>
-                  <p className="text-xs text-slate-500">Listagem completa do parque de Unidades Móveis e documentação</p>
+          const FrotaView = () => {
+            // Filtros da Tabela de Frota
+            const [filterCod, setFilterCod] = useState('');
+            const [filterOrigem, setFilterOrigem] = useState('');
+            const [filterStatus, setFilterStatus] = useState('');
+            const [filterCat, setFilterCat] = useState('');
+
+            const filteredFrotaLocal = FROTA_DATA.filter(item => {
+                const matchesCod = filterCod === '' || item.cod.toLowerCase().includes(filterCod.toLowerCase());
+                const matchesOrigem = filterOrigem === '' || 
+                                      item.unidade.toLowerCase().includes(filterOrigem.toLowerCase()) || 
+                                      item.origem.toLowerCase().includes(filterOrigem.toLowerCase());
+                const matchesStatus = filterStatus === '' || item.status === filterStatus;
+                const matchesCat = filterCat === '' || 
+                                   item.placa.toLowerCase().includes(filterCat.toLowerCase()) || 
+                                   item.categoria.toLowerCase().includes(filterCat.toLowerCase());
+                
+                return matchesCod && matchesOrigem && matchesStatus && matchesCat;
+            });
+
+            return (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">Quadro de Status da Frota</h3>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  <span className="inline-flex items-center px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold"><i className="fa-solid fa-circle-check mr-1"></i> Operacional</span>
-                  <span className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-bold"><i className="fa-solid fa-wrench mr-1"></i> Reforma</span>
-                  <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold"><i className="fa-solid fa-triangle-exclamation mr-1"></i> Manutenção</span>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
-                      <th className="p-3 font-semibold">Cód. U.Móvel</th>
-                      <th className="p-3 font-semibold">Unidade / Origem</th>
-                      <th className="p-3 font-semibold text-center">Status Operacional</th>
-                      <th className="p-3 font-semibold">Placa / Categoria</th>
-                      <th className="p-3 font-semibold text-center">Tempo (Anos)</th>
-                      <th className="p-3 font-semibold text-center">Und. Ar Cond.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {FROTA_DATA.map((frota, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-3 font-bold text-[#005CAA] whitespace-nowrap">{frota.cod}</td>
-                        <td className="p-3">
-                          <p className="text-slate-800 font-medium">{frota.unidade}</p>
-                          <p className="text-xs text-slate-500 uppercase">{frota.origem}</p>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
-                            frota.status === 'OPERACIONAL' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
-                            frota.status === 'REFORMA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
-                            'bg-red-100 text-red-700 border-red-200'
-                          }`}>
-                            {frota.status}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <p className="text-slate-800 font-mono font-medium">{frota.placa}</p>
-                          <p className="text-xs text-slate-500">{frota.categoria}</p>
-                        </td>
-                        <td className="p-3 text-center text-slate-800 font-medium">{frota.tempo}</td>
-                        <td className="p-3 text-center text-slate-800 font-medium">{frota.ar}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
+                        <th className="p-3 font-semibold">Cód. U.Móvel</th>
+                        <th className="p-3 font-semibold">Unidade / Origem</th>
+                        <th className="p-3 font-semibold text-center">Status Operacional</th>
+                        <th className="p-3 font-semibold">Placa / Categoria</th>
+                        <th className="p-3 font-semibold text-center">Tempo (Anos)</th>
+                        <th className="p-3 font-semibold text-center">Ar Cond.</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      {/* Sub-Header para os Filtros da Frota */}
+                      <tr className="bg-slate-100 border-b border-slate-200">
+                        <th className="p-2">
+                            <input type="text" placeholder="Filtrar Cód..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterCod} onChange={e => setFilterCod(e.target.value)} />
+                        </th>
+                        <th className="p-2">
+                            <input type="text" placeholder="Filtrar Origem..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterOrigem} onChange={e => setFilterOrigem(e.target.value)} />
+                        </th>
+                        <th className="p-2">
+                            <select className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="">Todos Status</option>
+                                <option value="OPERACIONAL">OPERACIONAL</option>
+                                <option value="REFORMA">REFORMA</option>
+                                <option value="MANUTENÇÃO">MANUTENÇÃO</option>
+                            </select>
+                        </th>
+                        <th className="p-2">
+                            <input type="text" placeholder="Filtrar Placa/Cat..." className="w-full p-1.5 text-xs border border-slate-300 rounded font-normal text-slate-700 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" value={filterCat} onChange={e => setFilterCat(e.target.value)} />
+                        </th>
+                        <th className="p-2 text-xs text-center text-slate-400 font-normal italic">Sem filtro</th>
+                        <th className="p-2 text-xs text-center text-slate-400 font-normal italic">Sem filtro</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {filteredFrotaLocal.map((frota, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-3 font-bold text-[#005CAA] whitespace-nowrap">{frota.cod}</td>
+                          <td className="p-3">
+                            <p className="text-slate-800 font-medium">{frota.unidade}</p>
+                            <p className="text-xs text-slate-500 uppercase">{frota.origem}</p>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
+                              frota.status === 'OPERACIONAL' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
+                              frota.status === 'REFORMA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
+                              'bg-red-100 text-red-700 border-red-200'
+                            }`}>
+                              {frota.status}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <p className="text-slate-800 font-mono font-medium">{frota.placa}</p>
+                            <p className="text-xs text-slate-500">{frota.categoria}</p>
+                          </td>
+                          <td className="p-3 text-center text-slate-800 font-medium">{frota.tempo}</td>
+                          <td className="p-3 text-center text-slate-800 font-medium">{frota.ar}</td>
+                        </tr>
+                      ))}
+                      {filteredFrotaLocal.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-slate-500">
+                            <i className="fa-solid fa-truck-slash text-5xl text-slate-300 mb-3 block mx-auto"></i>
+                            Nenhuma Unidade da Frota encontrada com estes filtros.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          );
+            );
+          };
 
           const SimulacaoView = () => {
-            const [simUM, setSimUM] = window.React.useState('');
-            const [simAlunos, setSimAlunos] = window.React.useState(20);
-            const [simHoras, setSimHoras] = window.React.useState(40);
-            const [simBase, setSimBase] = window.React.useState(25);
-            const [simAdicional, setSimAdicional] = window.React.useState(0);
+            const [simUM, setSimUM] = useState('');
+            const [simHoras, setSimHoras] = useState(160);
+            const [simBase, setSimBase] = useState(400); // Valor hora base
+            const [simAdicional, setSimAdicional] = useState(0);
 
-            const simulacao = window.React.useMemo(() => {
+            const simulacao = useMemo(() => {
               const umObj = FROTA_DATA.find(u => u.cod === simUM);
-              let fatorMultiplicador = 1.0;
-              let cat = 'Padrão';
-              if (umObj) {
-                cat = umObj.categoria;
-                if (cat === 'CARRETA') fatorMultiplicador = 1.3;
-                else if (cat === 'CONTEINERS') fatorMultiplicador = 0.9;
-                else if (cat === 'CAVALO MEC.') fatorMultiplicador = 0.5;
-              }
+              const subtotal = Number(simHoras) * Number(simBase);
+              const total = subtotal + Number(simAdicional);
 
-              const subtotalAlunos = Number(simAlunos) * Number(simHoras) * Number(simBase);
-              const valorComFator = subtotalAlunos * fatorMultiplicador;
-              const total = valorComFator + Number(simAdicional);
-
-              return { umObj, fatorMultiplicador, cat, subtotalAlunos, valorComFator, total };
-            }, [simUM, simAlunos, simHoras, simBase, simAdicional]);
+              return { umObj, subtotal, total };
+            }, [simUM, simHoras, simBase, simAdicional]);
 
             const agendarSimulacao = () => {
-              handleOpenModal({
-                um: simulacao.umObj ? simulacao.umObj.cod : '',
-                matriculas: simAlunos,
-                cargaHoraria: simHoras,
-                receita: simulacao.total
-              });
+              window.dispatchEvent(new CustomEvent('openModalCadastro', { 
+                  detail: { 
+                      prefill: {
+                        um: simulacao.umObj ? simulacao.umObj.cod : '',
+                        cargaHoraria: simHoras,
+                        receita: simulacao.total,
+                        matriculas: 0,
+                        escola: '', municipio: '', inicio: '', fim: '', impactoSocial: false
+                      }
+                  } 
+              }));
             };
 
             return (
@@ -704,24 +876,18 @@
                       <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50"
                         value={simUM} onChange={e => setSimUM(e.target.value)}>
                         <option value="">Selecione uma Unidade da Frota...</option>
-                        {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod} ({u.categoria}) - Status: {u.status}</option>)}
+                        {FROTA_DATA.map(u => <option key={u.cod} value={u.cod}>{u.cod} ({u.categoria})</option>)}
                       </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade de Alunos Prevista</label>
-                      <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                        value={simAlunos} onChange={e => setSimAlunos(e.target.value)} />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária (h)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Locada (h)</label>
                       <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
                         value={simHoras} onChange={e => setSimHoras(e.target.value)} />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Preço Base Sugerido (R$ / Aluno / Hora)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor da Hora (R$ / h)</label>
                       <input type="number" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
                         value={simBase} onChange={e => setSimBase(e.target.value)} />
                     </div>
@@ -741,17 +907,9 @@
                   <h3 className="text-lg font-bold text-blue-200 mb-4 border-b border-white/10 pb-2 relative z-10">Resumo da Cotação</h3>
                   
                   <div className="flex-1 space-y-4 relative z-10">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-blue-100">Subtotal (Alunos x H):</span>
-                      <span className="font-medium">{formatCurrency(simulacao.subtotalAlunos)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-blue-100">Fator Categoria U.M:</span>
-                      <span className="font-medium text-amber-300">{simulacao.cat} (x{simulacao.fatorMultiplicador})</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-blue-100">Valor Ajustado:</span>
-                      <span className="font-medium">{formatCurrency(simulacao.valorComFator)}</span>
+                    <div className="flex justify-between items-center text-sm border-b border-white/10 pb-4">
+                      <span className="text-blue-100">Cálculo Base (Hora x CH):</span>
+                      <span className="font-medium">{formatCurrency(simulacao.subtotal)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm border-b border-white/10 pb-4">
                       <span className="text-blue-100">Logística/Deslocamento:</span>
@@ -774,137 +932,17 @@
             );
           };
 
-          const ModalCadastro = () => {
-            if (!isModalOpen) return null;
-            return (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                      {editingItem ? <i className="fa-solid fa-pen mr-2 text-blue-600"></i> : <i className="fa-solid fa-plus mr-2 text-[#ED1C24]"></i>}
-                      {editingItem ? 'Editar Atendimento' : 'Nova Solicitação de U.Móvel'}
-                    </h2>
-                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto flex-1">
-                    <form id="reserva-form" onSubmit={handleSave} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div className="col-span-1 sm:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Escola Solicitante / Cliente</label>
-                        <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                          value={formData.escola} onChange={e => setFormData({...formData, escola: e.target.value})} placeholder="Ex: SENAI Aparecida de Goiânia" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
-                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          value={formData.um} onChange={e => setFormData({...formData, um: e.target.value})}>
-                          <option value="">Selecione...</option>
-                          {UMS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Área Tecnológica</label>
-                        <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})}>
-                          <option value="">Selecione...</option>
-                          {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Município de Destino</label>
-                        <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.municipio} onChange={e => setFormData({...formData, municipio: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Status Operacional</label>
-                        <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}
-                        >
-                          <option value="Agendado">Agendado (Solicitado)</option>
-                          <option value="Em Andamento">Em Andamento</option>
-                          <option value="Concluído">Concluído</option>
-                          <option value="Manutenção">Manutenção / Deslocamento</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
-                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Data de Término</label>
-                        <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.fim} onChange={e => setFormData({...formData, fim: e.target.value})} />
-                      </div>
-                      <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2">
-                        <h4 className="text-sm font-semibold text-slate-800 mb-4">Indicadores de Desempenho</h4>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Previsão de Matrículas</label>
-                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.matriculas} onChange={e => setFormData({...formData, matriculas: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Total (h)</label>
-                        <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.cargaHoraria} onChange={e => setFormData({...formData, cargaHoraria: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Receita Estimada (R$)</label>
-                        <input type="number" min="0" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
-                          value={formData.receita} onChange={e => setFormData({...formData, receita: e.target.value})} />
-                      </div>
-                      <div className="flex items-center mt-6">
-                        <label className="flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={formData.impactoSocial} onChange={e => setFormData({...formData, impactoSocial: e.target.checked})} />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                          <span className="ml-3 text-sm font-medium text-slate-700">Ação de Impacto Social / Gratuita</span>
-                        </label>
-                      </div>
-                    </form>
-                  </div>
-                  
-                  <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors">
-                      Cancelar
-                    </button>
-                    <button type="submit" form="reserva-form" className="px-5 py-2.5 bg-[#005CAA] text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors shadow-sm flex items-center">
-                      <i className="fa-solid fa-check mr-2"></i> Salvar {editingItem ? 'Alterações' : 'Reserva'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          };
-
-          const ModalExclusao = () => {
-            if (!deleteConfirmId) return null;
-            return (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
-                  <i className="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-4"></i>
-                  <h3 className="text-lg font-bold text-slate-800 mb-2">Confirmar Exclusão</h3>
-                  <p className="text-sm text-slate-500 mb-6">Tem certeza que deseja excluir este atendimento? Esta ação não pode ser desfeita.</p>
-                  <div className="flex justify-center space-x-3">
-                    <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50">Cancelar</button>
-                    <button onClick={executeDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 shadow-sm">Sim, Excluir</button>
-                  </div>
-                </div>
-              </div>
-            );
+          const executeDelete = () => {
+            setAtendimentos(prev => prev.filter(a => a.id !== deleteConfirmId));
+            setDeleteConfirmId(null);
+            recordUpdate();
           };
 
           return (
             <div className="min-h-screen flex font-sans text-slate-900">
               <aside className="hidden md:flex flex-col w-64 bg-[#002f5c] text-white shadow-xl z-20">
                 <div className="p-4 border-b border-white/10 flex items-center justify-center bg-white">
-                  <img 
-                    src="https://i.postimg.cc/0Nh7xNQL/LOGO-UNIDADES-MOVEIS-SESI-2025.png" 
-                    alt="Logo SESI SENAI Unidades Móveis" 
-                    className="w-full h-auto max-h-16 object-contain"
-                  />
+                  <img src="https://i.postimg.cc/0Nh7xNQL/LOGO-UNIDADES-MOVEIS-SESI-2025.png" alt="Logo SESI SENAI Unidades Móveis" className="w-full h-auto max-h-16 object-contain" />
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
                   <button onClick={() => setView('dashboard')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'dashboard' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
@@ -932,35 +970,22 @@
                       <i className="fa-solid fa-bars text-xl"></i>
                     </button>
                     <h2 className="text-lg font-bold text-[#002f5c] hidden sm:block">SIGUM - Sistema de Gestão de Unidades Móveis</h2>
-                    <h2 className="text-lg font-bold text-[#002f5c] sm:hidden">SIGUM</h2>
                   </div>
 
                   <div className="flex items-center space-x-4">
-                     <div className="md:hidden flex items-center bg-slate-100 rounded-full px-3 py-1 border border-slate-200">
-                       <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
-                       <span className="text-xs font-semibold text-slate-600">Admin</span>
-                     </div>
-                    <div className="w-8 h-8 rounded-full bg-[#005CAA] text-white flex items-center justify-center font-bold text-sm shadow-inner cursor-pointer hover:ring-2 ring-offset-2 ring-blue-500 transition">
-                      AD
+                     <label className="hidden md:flex items-center cursor-pointer px-3 py-1 bg-slate-100 rounded-full border border-slate-200">
+                        <span className="text-xs font-semibold text-slate-600 mr-2">Acesso CMOV</span>
+                        <input type="checkbox" className="sr-only peer" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} />
+                        <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#005CAA] relative"></div>
+                     </label>
+                    <div className="w-8 h-8 rounded-full bg-[#005CAA] text-white flex items-center justify-center font-bold text-sm shadow-inner">
+                      {isAdmin ? 'AD' : 'ES'}
                     </div>
                   </div>
                 </header>
 
-                {isMobileMenuOpen && (
-                  <div className="absolute top-16 left-0 right-0 bg-[#002f5c] text-white shadow-xl z-20 md:hidden animate-in slide-in-from-top-2 border-b border-[#001529]">
-                    <nav className="flex flex-col p-2 space-y-1">
-                      <button onClick={() => {setView('dashboard'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'dashboard' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-chart-line mr-2"></i> Dashboard</button>
-                      <button onClick={() => {setView('reservas'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'reservas' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calendar-days mr-2"></i> Reservas</button>
-                      <button onClick={() => {setView('gantt'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'gantt' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck mr-2"></i> Gantt Frota</button>
-                      <button onClick={() => {setView('frota'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'frota' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-truck-fast mr-2"></i> Quadro da Frota</button>
-                      <button onClick={() => {setView('simulacao'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'simulacao' ? 'bg-[#005CAA]' : ''}`}><i className="fa-solid fa-calculator mr-2"></i> Simulador Contrato</button>
-                    </nav>
-                  </div>
-                )}
-
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
-                  <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
+                  <div className="mb-6">
                       <h2 className="text-2xl font-bold text-slate-800">
                         {view === 'dashboard' && 'Visão Geral CMOV'}
                         {view === 'reservas' && 'Gestão de Reservas U.M'}
@@ -969,18 +994,7 @@
                         {view === 'simulacao' && 'Simulador de Contratos'}
                       </h2>
                       <p className="text-slate-500 text-sm mt-1">Acompanhe e gerencie a frota de unidades móveis do SENAI Goiás.</p>
-                      
-                      {}
-                      <div className="mt-3 inline-flex items-center px-2.5 py-1 rounded-md bg-blue-50 border border-blue-100 text-xs font-medium text-blue-700 shadow-sm">
-                        <i className="fa-solid fa-cloud-arrow-down mr-1.5"></i>
-                        {lastUpdated ? `Última edição local: ${lastUpdated}` : 'Modo de visualização padrão'}
-                      </div>
-                    </div>
-                    {view === 'dashboard' && (
-                      <button className="flex items-center px-4 py-2 bg-white border border-slate-300 shadow-sm rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        <i className="fa-solid fa-file-excel mr-2 text-green-600"></i> Exportar Relatório
-                      </button>
-                    )}
+                      {lastUpdated && <div className="mt-2 inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded border border-blue-100"><i className="fa-solid fa-cloud-arrow-down mr-1"></i> Dados locais atualizados em: {lastUpdated}</div>}
                   </div>
 
                   {view === 'dashboard' && <DashboardView />}
@@ -990,9 +1004,22 @@
                   {view === 'simulacao' && <SimulacaoView />}
                 </div>
               </main>
-
+              
               <ModalCadastro />
-              <ModalExclusao />
+              
+              {deleteConfirmId && (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
+                  <i className="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-4"></i>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">Confirmar Exclusão</h3>
+                  <p className="text-sm text-slate-500 mb-6">Tem certeza que deseja excluir este atendimento?</p>
+                  <div className="flex justify-center space-x-3">
+                    <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50">Cancelar</button>
+                    <button onClick={executeDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 shadow-sm">Sim, Excluir</button>
+                  </div>
+                </div>
+              </div>
+              )}
             </div>
           );
         }
