@@ -105,7 +105,42 @@
 
         function App() {
           const [view, setView] = useState('dashboard');
-          const [atendimentos, setAtendimentos] = useState(INITIAL_DATA);
+          
+          const [atendimentos, setAtendimentos] = useState(() => {
+            try {
+              const savedData = localStorage.getItem('sigum_atendimentos');
+              return savedData ? JSON.parse(savedData) : INITIAL_DATA;
+            } catch (e) {
+              return INITIAL_DATA;
+            }
+          });
+
+          const [lastUpdated, setLastUpdated] = useState(() => {
+            try {
+              return localStorage.getItem('sigum_lastUpdated') || null;
+            } catch (e) {
+              return null;
+            }
+          });
+
+          useEffect(() => {
+            try {
+              localStorage.setItem('sigum_atendimentos', JSON.stringify(atendimentos));
+            } catch (e) {}
+          }, [atendimentos]);
+
+          useEffect(() => {
+            if (lastUpdated) {
+              try {
+                localStorage.setItem('sigum_lastUpdated', lastUpdated);
+              } catch (e) {}
+            }
+          }, [lastUpdated]);
+
+          const recordUpdate = () => {
+            setLastUpdated(new Date().toLocaleString('pt-BR'));
+          };
+
           const [searchTerm, setSearchTerm] = useState('');
           
           const [isModalOpen, setIsModalOpen] = useState(false);
@@ -212,6 +247,7 @@
                 return [...prev, { ...formData, id: Date.now() }];
               }
             });
+            recordUpdate(); // Salva a data exata da modificação
             setIsModalOpen(false);
           };
 
@@ -222,6 +258,7 @@
           const executeDelete = () => {
             setAtendimentos(prev => prev.filter(a => a.id !== deleteConfirmId));
             setDeleteConfirmId(null);
+            recordUpdate(); // Salva a data exata da modificação
           };
 
           const filteredAtendimentos = atendimentos.filter(a => 
@@ -932,6 +969,12 @@
                         {view === 'simulacao' && 'Simulador de Contratos'}
                       </h2>
                       <p className="text-slate-500 text-sm mt-1">Acompanhe e gerencie a frota de unidades móveis do SENAI Goiás.</p>
+                      
+                      {}
+                      <div className="mt-3 inline-flex items-center px-2.5 py-1 rounded-md bg-blue-50 border border-blue-100 text-xs font-medium text-blue-700 shadow-sm">
+                        <i className="fa-solid fa-cloud-arrow-down mr-1.5"></i>
+                        {lastUpdated ? `Última edição local: ${lastUpdated}` : 'Modo de visualização padrão'}
+                      </div>
                     </div>
                     {view === 'dashboard' && (
                       <button className="flex items-center px-4 py-2 bg-white border border-slate-300 shadow-sm rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
