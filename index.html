@@ -1,0 +1,736 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, LabelList
+} from 'recharts';
+import { 
+  LayoutDashboard, CalendarDays, BarChart3, Plus, Edit, Trash2, 
+  Settings, Truck, Users, Clock, DollarSign, MapPin, Search, 
+  Filter, X, Check, AlertCircle, ShieldAlert, FileSpreadsheet, ChevronRight, Menu
+} from 'lucide-react';
+
+// Mock data representing "ATENDIMENTOS U.MOVEIS.xlsx"
+const INITIAL_DATA = [
+  { id: 1, um: 'UM-01 Confecção', area: 'Vestuário', escola: 'FATEC SENAI Ítalo Bologna', municipio: 'Goiânia', inicio: '2026-06-10', fim: '2026-07-20', status: 'Em Andamento', matriculas: 120, cargaHoraria: 160, receita: 45000, impactoSocial: true },
+  { id: 2, um: 'UM-02 Solda', area: 'Metalmecânica', escola: 'SENAI Vila Canaã', municipio: 'Aparecida de Goiânia', inicio: '2026-06-01', fim: '2026-06-30', status: 'Em Andamento', matriculas: 80, cargaHoraria: 200, receita: 60000, impactoSocial: false },
+  { id: 3, um: 'UM-03 Informática', area: 'TI', escola: 'SENAI Anápolis', municipio: 'Anápolis', inicio: '2026-07-05', fim: '2026-08-15', status: 'Agendado', matriculas: 150, cargaHoraria: 80, receita: 30000, impactoSocial: true },
+  { id: 4, um: 'UM-04 Panificação', area: 'Alimentos', escola: 'SENAI Rio Verde', municipio: 'Rio Verde', inicio: '2026-05-15', fim: '2026-06-15', status: 'Concluído', matriculas: 90, cargaHoraria: 120, receita: 40000, impactoSocial: false },
+  { id: 5, um: 'UM-05 Eletroeletrônica', area: 'Eletroeletrônica', escola: 'SENAI Catalão', municipio: 'Catalão', inicio: '2026-06-25', fim: '2026-07-05', status: 'Manutenção', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false },
+  { id: 6, um: 'UM-06 Automotiva', area: 'Automotiva', escola: 'SENAI Itumbiara', municipio: 'Itumbiara', inicio: '2026-08-01', fim: '2026-09-30', status: 'Agendado', matriculas: 60, cargaHoraria: 240, receita: 80000, impactoSocial: false },
+  { id: 7, um: 'UM-01 Confecção', area: 'Vestuário', escola: 'SENAI Trindade', municipio: 'Trindade', inicio: '2026-08-01', fim: '2026-09-15', status: 'Agendado', matriculas: 100, cargaHoraria: 160, receita: 40000, impactoSocial: true },
+];
+
+const STATUS_COLORS = {
+  'Agendado': '#3b82f6', // blue-500
+  'Em Andamento': '#10b981', // emerald-500
+  'Concluído': '#6b7280', // gray-500
+  'Manutenção': '#ef4444', // red-500
+};
+
+const AREAS = ['Vestuário', 'Metalmecânica', 'TI', 'Alimentos', 'Eletroeletrônica', 'Automotiva', 'Construção Civil'];
+const UMS = ['UM-01 Confecção', 'UM-02 Solda', 'UM-03 Informática', 'UM-04 Panificação', 'UM-05 Eletroeletrônica', 'UM-06 Automotiva', 'UM-07 Indústria 4.0'];
+
+// Helper to format currency
+const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+// Helper to format dates
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+// Date math for Gantt
+const getDaysBetween = (start, end) => {
+  const d1 = new Date(start);
+  const d2 = new Date(end);
+  return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+};
+
+export default function App() {
+  const [view, setView] = useState('dashboard'); // dashboard | reservas | gantt
+  const [role, setRole] = useState('admin'); // admin (CMOV) | user (Escola)
+  const [atendimentos, setAtendimentos] = useState(INITIAL_DATA);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({
+    um: '', area: '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false
+  });
+
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // KPIs Calculation
+  const kpis = useMemo(() => {
+    return atendimentos.reduce((acc, curr) => {
+      if (curr.status !== 'Manutenção' && curr.status !== 'Cancelado') {
+        acc.matriculas += Number(curr.matriculas);
+        acc.cargaHoraria += Number(curr.cargaHoraria);
+        acc.receita += Number(curr.receita);
+      }
+      acc.total++;
+      if (curr.status === 'Em Andamento') acc.ativos++;
+      return acc;
+    }, { total: 0, ativos: 0, matriculas: 0, cargaHoraria: 0, receita: 0 });
+  }, [atendimentos]);
+
+  // Chart Data Preparation
+  const chartDataArea = useMemo(() => {
+    const data = {};
+    atendimentos.forEach(a => {
+      if (!data[a.area]) data[a.area] = { name: a.area, Atendimentos: 0, matriculas: 0, receita: 0, cargaHoraria: 0 };
+      data[a.area].Atendimentos++;
+      data[a.area].matriculas += Number(a.matriculas) || 0;
+      data[a.area].receita += Number(a.receita) || 0;
+      data[a.area].cargaHoraria += Number(a.cargaHoraria) || 0;
+    });
+    return Object.values(data).sort((a, b) => b.Atendimentos - a.Atendimentos);
+  }, [atendimentos]);
+
+  const chartDataStatus = useMemo(() => {
+    const data = {};
+    atendimentos.forEach(a => {
+      if (!data[a.status]) data[a.status] = { name: a.status, value: 0, matriculas: 0, receita: 0, cargaHoraria: 0, color: STATUS_COLORS[a.status] };
+      data[a.status].value++;
+      data[a.status].matriculas += Number(a.matriculas) || 0;
+      data[a.status].receita += Number(a.receita) || 0;
+      data[a.status].cargaHoraria += Number(a.cargaHoraria) || 0;
+    });
+    return Object.values(data);
+  }, [atendimentos]);
+
+  const chartDataUM = useMemo(() => {
+    const data = {};
+    atendimentos.forEach(a => {
+      const shortName = a.um.split(' ')[0]; // Ex: UM-01
+      if (!data[shortName]) data[shortName] = { name: shortName, fullName: a.um, matriculas: 0, receita: 0, Atendimentos: 0 };
+      data[shortName].Atendimentos++;
+      data[shortName].matriculas += Number(a.matriculas) || 0;
+      data[shortName].receita += Number(a.receita) || 0;
+    });
+    return Object.values(data).sort((a,b) => a.name.localeCompare(b.name));
+  }, [atendimentos]);
+
+  // Rótulo Flutuante Personalizado para Gráficos
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-4 border border-slate-200 shadow-xl rounded-xl text-sm min-w-[220px] z-50">
+          <p className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{data.fullName || label || data.name}</p>
+          <div className="space-y-2">
+            <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Qtd. Atendimentos:</span> <span>{data.Atendimentos || data.value}</span></p>
+            <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Matrículas:</span> <span>{data.matriculas?.toLocaleString('pt-BR') || 0}</span></p>
+            <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Carga Horária:</span> <span>{data.cargaHoraria ? `${data.cargaHoraria.toLocaleString('pt-BR')}h` : '0h'}</span></p>
+            <p className="flex justify-between items-center text-slate-600"><span className="font-medium text-slate-800 mr-4">Receita Prevista:</span> <span className="font-semibold text-emerald-600">{formatCurrency(data.receita || 0)}</span></p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const handleOpenModal = (item = null) => {
+    if (item) {
+      setEditingItem(item.id);
+      setFormData({ ...item });
+    } else {
+      setEditingItem(null);
+      setFormData({
+        um: '', area: '', escola: '', municipio: '', inicio: '', fim: '', status: 'Agendado', matriculas: 0, cargaHoraria: 0, receita: 0, impactoSocial: false
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (editingItem) {
+      setAtendimentos(atendimentos.map(a => a.id === editingItem ? { ...formData, id: editingItem } : a));
+    } else {
+      setAtendimentos([...atendimentos, { ...formData, id: Date.now() }]);
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (id) => {
+    if (confirm('Tem certeza que deseja excluir este atendimento?')) {
+      setAtendimentos(atendimentos.filter(a => a.id !== id));
+    }
+  };
+
+  const filteredAtendimentos = atendimentos.filter(a => 
+    a.um.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.escola.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.municipio.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const DashboardView = () => (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+          <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><Truck size={24} /></div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">U.Ms em Operação</p>
+            <p className="text-2xl font-bold text-slate-800">{kpis.ativos} <span className="text-sm font-normal text-slate-400">/ {UMS.length}</span></p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+          <div className="p-3 bg-emerald-100 text-emerald-700 rounded-lg"><Users size={24} /></div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Total Matrículas (Proj.)</p>
+            <p className="text-2xl font-bold text-slate-800">{kpis.matriculas.toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+          <div className="p-3 bg-amber-100 text-amber-700 rounded-lg"><Clock size={24} /></div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Carga Horária (h)</p>
+            <p className="text-2xl font-bold text-slate-800">{kpis.cargaHoraria.toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center space-x-4">
+          <div className="p-3 bg-indigo-100 text-indigo-700 rounded-lg"><DollarSign size={24} /></div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Receita Estimada</p>
+            <p className="text-2xl font-bold text-slate-800">{formatCurrency(kpis.receita)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><BarChart3 size={18} className="mr-2 text-slate-500"/> Atendimentos por Área Tecnológica</h3>
+          <p className="text-xs text-slate-500 mb-4">Passe o mouse nas barras para ver receita, matrículas e horas operacionais.</p>
+          <div className="flex-1 w-full min-h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartDataArea} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{fontSize: 12}} interval={0} angle={-35} textAnchor="end" height={60} />
+                <YAxis tick={{fontSize: 12}} />
+                <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                <Bar dataKey="Atendimentos" fill="#0284c7" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="Atendimentos" position="top" fill="#475569" fontSize={12} fontWeight={600} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><PieChart size={18} className="mr-2 text-slate-500"/> Status da Frota</h3>
+          <p className="text-xs text-slate-500 mb-4">Detalhamento de volume e valores retidos em cada status.</p>
+          <div className="flex-1 w-full min-h-[300px] flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <Pie
+                  data={chartDataStatus}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={65}
+                  outerRadius={95}
+                  paddingAngle={5}
+                  dataKey="value"
+                  labelLine={true}
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                >
+                  {chartDataStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        {/* Nova Linha de Gráfico - Desempenho por Unidade */}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
+          <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center"><Truck size={18} className="mr-2 text-slate-500"/> Desempenho por Unidade Móvel (Receita Estimada)</h3>
+          <p className="text-xs text-slate-500 mb-4">Visão financeira e de matrículas de cada carreta. Passe o mouse na barra verde para inspecionar os detalhes.</p>
+          <div className="w-full h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartDataUM} margin={{ top: 20, right: 10, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{fontSize: 12}} />
+                <YAxis tick={{fontSize: 12}} tickFormatter={(value) => `R$ ${value/1000}k`} />
+                <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                <Bar dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} name="Receita (R$)">
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+
+  const ReservasView = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
+      {/* Toolbar */}
+      <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input 
+            type="text" 
+            placeholder="Buscar por U.M, Escola ou Município..." 
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex space-x-2 w-full sm:w-auto">
+          <button className="flex items-center justify-center px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 w-full sm:w-auto transition-colors">
+            <Filter size={16} className="mr-2" /> Filtros
+          </button>
+          <button 
+            onClick={() => handleOpenModal()}
+            className="flex items-center justify-center px-4 py-2 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-red-700 w-full sm:w-auto shadow-sm transition-colors"
+          >
+            <Plus size={16} className="mr-2" /> Nova Reserva
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+              <th className="p-4 font-semibold">Unidade Móvel</th>
+              <th className="p-4 font-semibold">Escola/Município</th>
+              <th className="p-4 font-semibold">Período</th>
+              <th className="p-4 font-semibold">Status</th>
+              <th className="p-4 font-semibold">Matr. / Horas</th>
+              <th className="p-4 font-semibold text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="text-sm divide-y divide-slate-200">
+            {filteredAtendimentos.map(item => (
+              <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                <td className="p-4">
+                  <p className="font-medium text-slate-800">{item.um}</p>
+                  <p className="text-xs text-slate-500">{item.area}</p>
+                </td>
+                <td className="p-4">
+                  <p className="text-slate-800">{item.escola}</p>
+                  <p className="text-xs text-slate-500 flex items-center mt-0.5"><MapPin size={12} className="mr-1"/> {item.municipio}</p>
+                </td>
+                <td className="p-4 whitespace-nowrap">
+                  <p className="text-slate-800">{formatDate(item.inicio)}</p>
+                  <p className="text-slate-500 text-xs">até {formatDate(item.fim)}</p>
+                </td>
+                <td className="p-4">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border`} style={{
+                    backgroundColor: `${STATUS_COLORS[item.status]}15`,
+                    color: STATUS_COLORS[item.status],
+                    borderColor: `${STATUS_COLORS[item.status]}30`
+                  }}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="p-4 whitespace-nowrap">
+                  <p className="text-slate-800">{item.matriculas} alunos</p>
+                  <p className="text-slate-500 text-xs">{item.cargaHoraria}h</p>
+                </td>
+                <td className="p-4 text-center">
+                  <div className="flex justify-center space-x-2">
+                    {/* Role Based Access Check simulated */}
+                    {(role === 'admin' || (role === 'user' && item.status === 'Agendado')) ? (
+                      <>
+                        <button onClick={() => handleOpenModal(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                          <Edit size={18} />
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Excluir">
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <button disabled className="p-1.5 text-slate-300 cursor-not-allowed" title="Sem permissão">
+                         <ShieldAlert size={18} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filteredAtendimentos.length === 0 && (
+              <tr>
+                <td colSpan="6" className="p-8 text-center text-slate-500">
+                  <FileSpreadsheet className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                  Nenhum atendimento encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const GanttView = () => {
+    // Generate next 4 months array for header (base fixed to Jun/2026 for mock data)
+    const timelineStart = new Date('2026-06-01T00:00:00'); 
+    const months = [];
+    for(let i=0; i<4; i++) {
+      let d = new Date(timelineStart.getFullYear(), timelineStart.getMonth() + i, 1);
+      months.push({ name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(), year: d.getFullYear(), days: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() });
+    }
+    
+    const totalDaysTimeline = months.reduce((acc, m) => acc + m.days, 0);
+
+    // Calc "Today" Indicator Line position
+    const todayReal = new Date();
+    const timeDiffToToday = todayReal.getTime() - timelineStart.getTime();
+    const daysExactToToday = timeDiffToToday / (1000 * 60 * 60 * 24);
+    const todayLeftPercent = (daysExactToToday / totalDaysTimeline) * 100;
+    const isTodayInView = todayLeftPercent >= 0 && todayLeftPercent <= 100;
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px] animate-in fade-in duration-500">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+          <div>
+            <h3 className="font-semibold text-slate-800">Mapa de Ocupação (Gantt)</h3>
+            <p className="text-xs text-slate-500">Visão de Ocupação da Frota</p>
+          </div>
+          <div className="flex items-center space-x-3 text-xs">
+            <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> Agendado</span>
+            <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-500 mr-1"></span> Andamento</span>
+            <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-500 mr-1"></span> Manutenção</span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto flex">
+          {/* Y Axis - UMs */}
+          <div className="w-48 sm:w-64 border-r border-slate-200 flex-shrink-0 bg-white sticky left-0 z-30 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+            <div className="h-12 border-b border-slate-200 bg-slate-50"></div> {/* Header spacer */}
+            {UMS.map((um, i) => (
+              <div key={um} className="h-16 flex flex-col justify-center px-4 border-b border-slate-100">
+                <span className="text-sm font-medium text-slate-800 truncate">{um}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* X Axis - Timeline */}
+          <div className="flex-1 min-w-[800px] relative">
+            
+            {/* Linha do Dia Atual (Demarcação dinâmica) */}
+            {isTodayInView && (
+              <div
+                className="absolute top-0 bottom-0 border-l-2 border-[#ED1C24] border-dashed z-20 pointer-events-none flex flex-col items-center"
+                style={{ left: `${todayLeftPercent}%` }}
+              >
+                <div className="bg-[#ED1C24] text-white text-[10px] px-2 py-0.5 rounded-b font-bold shadow-sm whitespace-nowrap -translate-x-1/2 mt-0">
+                  Hoje
+                </div>
+              </div>
+            )}
+
+            {/* Months Header */}
+            <div className="h-12 border-b border-slate-200 bg-slate-50 flex relative z-10">
+              {months.map((m, i) => (
+                <div key={i} className="border-r border-slate-200 flex items-center justify-center text-xs font-semibold text-slate-500" style={{ width: `${(m.days / totalDaysTimeline) * 100}%`}}>
+                  {m.name} {m.year}
+                </div>
+              ))}
+            </div>
+
+            {/* Grid & Bars Container */}
+            <div className="relative" style={{ height: `${UMS.length * 4}rem` }}>
+              {/* Vertical lines for months */}
+              {months.map((m, i) => {
+                const prevDays = months.slice(0, i).reduce((acc, curr) => acc + curr.days, 0);
+                return (
+                  <div key={i} className="absolute top-0 bottom-0 border-l border-slate-100 z-0" style={{ left: `${(prevDays / totalDaysTimeline) * 100}%` }}></div>
+                );
+              })}
+
+              {/* Rows */}
+              {UMS.map((um, rowIndex) => {
+                const umAtendimentos = atendimentos.filter(a => a.um === um);
+                return (
+                  <div key={rowIndex} className="h-16 border-b border-slate-100 relative group hover:bg-slate-50/50 z-10">
+                    {umAtendimentos.map(atend => {
+                      const start = new Date(`${atend.inicio}T00:00:00`);
+                      const end = new Date(`${atend.fim}T00:00:00`);
+                      
+                      // Skip if completely outside our fixed timeline
+                      if (end < timelineStart) return null;
+
+                      // Cap start/end for visual purposes if they exceed boundaries
+                      const visualStart = start < timelineStart ? timelineStart : start;
+                      
+                      const daysFromStart = getDaysBetween(timelineStart, visualStart);
+                      const duration = getDaysBetween(visualStart, end);
+                      
+                      const leftPercent = (daysFromStart / totalDaysTimeline) * 100;
+                      const widthPercent = (duration / totalDaysTimeline) * 100;
+
+                      return (
+                        <div 
+                          key={atend.id}
+                          className="absolute top-3 h-10 rounded-md shadow-sm flex items-center px-2 text-white text-xs truncate cursor-pointer transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden"
+                          style={{
+                            left: `${Math.max(0, leftPercent)}%`,
+                            width: `${widthPercent}%`,
+                            backgroundColor: STATUS_COLORS[atend.status],
+                          }}
+                          title={`${atend.escola} (${formatDate(atend.inicio)} a ${formatDate(atend.fim)})`}
+                          onClick={() => handleOpenModal(atend)}
+                        >
+                          <span className="truncate w-full drop-shadow-sm">{atend.escola}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ModalCadastro = () => {
+    if (!isModalOpen) return null;
+    return (
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+            <h2 className="text-xl font-bold text-slate-800 flex items-center">
+              {editingItem ? <Edit className="mr-2 text-blue-600" /> : <Plus className="mr-2 text-[#ED1C24]" />}
+              {editingItem ? 'Editar Atendimento' : 'Nova Solicitação de U.Móvel'}
+            </h2>
+            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition">
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div className="p-6 overflow-y-auto flex-1">
+            <form id="reserva-form" onSubmit={handleSave} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              
+              <div className="col-span-1 sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Escola Solicitante / Cliente</label>
+                <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  value={formData.escola} onChange={e => setFormData({...formData, escola: e.target.value})} placeholder="Ex: SENAI Aparecida de Goiânia" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Unidade Móvel Requerida</label>
+                <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={formData.um} onChange={e => setFormData({...formData, um: e.target.value})}>
+                  <option value="">Selecione...</option>
+                  {UMS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Área Tecnológica</label>
+                <select required className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})}>
+                  <option value="">Selecione...</option>
+                  {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Município de Destino</label>
+                <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.municipio} onChange={e => setFormData({...formData, municipio: e.target.value})} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Status Operacional</label>
+                <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}
+                  disabled={role === 'user' && !editingItem} // User can only request (Agendado)
+                >
+                  <option value="Agendado">Agendado (Solicitado)</option>
+                  <option value="Em Andamento">Em Andamento</option>
+                  <option value="Concluído">Concluído</option>
+                  <option value="Manutenção">Manutenção / Deslocamento</option>
+                </select>
+                {role === 'user' && <p className="text-xs text-slate-500 mt-1">Apenas CMOV pode alterar status para Em Andamento.</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
+                <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data de Término</label>
+                <input required type="date" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.fim} onChange={e => setFormData({...formData, fim: e.target.value})} />
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-200 mt-2">
+                <h4 className="text-sm font-semibold text-slate-800 mb-4">Indicadores de Desempenho / Planejamento</h4>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Previsão de Matrículas</label>
+                <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.matriculas} onChange={e => setFormData({...formData, matriculas: e.target.value})} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Carga Horária Total (h)</label>
+                <input type="number" min="0" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.cargaHoraria} onChange={e => setFormData({...formData, cargaHoraria: e.target.value})} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Receita Estimada (R$)</label>
+                <input type="number" min="0" step="0.01" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  value={formData.receita} onChange={e => setFormData({...formData, receita: e.target.value})} />
+              </div>
+
+              <div className="flex items-center mt-6">
+                <label className="flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={formData.impactoSocial} onChange={e => setFormData({...formData, impactoSocial: e.target.checked})} />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <span className="ml-3 text-sm font-medium text-slate-700">Ação de Impacto Social / Gratuita</span>
+                </label>
+              </div>
+
+            </form>
+          </div>
+          
+          <div className="p-5 border-t border-slate-200 bg-slate-50 flex justify-end space-x-3">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-100 transition-colors">
+              Cancelar
+            </button>
+            <button type="submit" form="reserva-form" className="px-5 py-2.5 bg-[#005CAA] text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors shadow-sm flex items-center">
+              <Check size={18} className="mr-2" /> Salvar {editingItem ? 'Alterações' : 'Reserva'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex font-sans text-slate-900">
+      
+      {/* Sidebar - Desktop */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#002f5c] text-white shadow-xl z-20">
+        <div className="p-4 border-b border-white/10 flex items-center justify-center bg-white">
+          <img 
+            src="https://i.postimg.cc/0Nh7xNQL/LOGO-UNIDADES-MOVEIS-SESI-2025.png" 
+            alt="Logo SESI SENAI Unidades Móveis" 
+            className="w-full h-auto max-h-16 object-contain"
+          />
+        </div>
+        <nav className="flex-1 p-4 space-y-2">
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'dashboard' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
+            <LayoutDashboard size={20} className="mr-3" /> Dashboard CMOV
+          </button>
+          <button onClick={() => setView('reservas')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'reservas' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
+            <CalendarDays size={20} className="mr-3" /> Calendário / Reservas
+          </button>
+          <button onClick={() => setView('gantt')} className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${view === 'gantt' ? 'bg-[#005CAA] text-white' : 'text-blue-100 hover:bg-white/10'}`}>
+            <Truck size={20} className="mr-3" /> Monitoramento Frota
+          </button>
+        </nav>
+        
+        {/* Role Simulator Switch */}
+        <div className="p-4 bg-[#002040] border-t border-white/10">
+          <p className="text-xs text-blue-300 font-semibold mb-2 uppercase tracking-wider">Simulador de Perfil</p>
+          <div className="flex bg-[#001529] rounded-lg p-1">
+            <button onClick={() => setRole('admin')} className={`flex-1 text-xs py-1.5 rounded-md transition-all ${role === 'admin' ? 'bg-[#005CAA] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-white'}`}>CMOV</button>
+            <button onClick={() => setRole('user')} className={`flex-1 text-xs py-1.5 rounded-md transition-all ${role === 'user' ? 'bg-[#005CAA] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-white'}`}>Escola / RM</button>
+          </div>
+          <p className="text-[10px] text-blue-400 mt-2 text-center leading-tight">
+            {role === 'admin' ? 'Acesso total de gestão e exclusão.' : 'Acesso de consulta e solicitação.'}
+          </p>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        
+        {/* Header - Mobile & Search */}
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-6 z-10 shrink-0 shadow-sm">
+          <div className="flex items-center">
+            <button className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg mr-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              <Menu size={24} />
+            </button>
+            <h2 className="text-lg font-bold text-[#002f5c] hidden sm:block">SIGUM - Sistema de Gestão de Unidades Móveis</h2>
+            <h2 className="text-lg font-bold text-[#002f5c] sm:hidden">SIGUM</h2>
+          </div>
+
+          <div className="flex items-center space-x-4">
+             {/* Header Role indicator (Mobile mainly) */}
+             <div className="md:hidden flex items-center bg-slate-100 rounded-full px-3 py-1 border border-slate-200">
+               <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+               <span className="text-xs font-semibold text-slate-600">{role === 'admin' ? 'CMOV' : 'Escola'}</span>
+             </div>
+
+            <div className="w-8 h-8 rounded-full bg-[#005CAA] text-white flex items-center justify-center font-bold text-sm shadow-inner cursor-pointer hover:ring-2 ring-offset-2 ring-blue-500 transition">
+              {role === 'admin' ? 'CM' : 'ES'}
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Navigation Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-16 left-0 right-0 bg-[#002f5c] text-white shadow-xl z-20 md:hidden animate-in slide-in-from-top-2 border-b border-[#001529]">
+            <nav className="flex flex-col p-2 space-y-1">
+              <button onClick={() => {setView('dashboard'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'dashboard' ? 'bg-[#005CAA]' : ''}`}><LayoutDashboard className="inline mr-2" size={18}/> Dashboard</button>
+              <button onClick={() => {setView('reservas'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'reservas' ? 'bg-[#005CAA]' : ''}`}><CalendarDays className="inline mr-2" size={18}/> Reservas</button>
+              <button onClick={() => {setView('gantt'); setIsMobileMenuOpen(false)}} className={`p-3 text-left rounded-lg text-sm font-medium ${view === 'gantt' ? 'bg-[#005CAA]' : ''}`}><Truck className="inline mr-2" size={18}/> Gantt Frota</button>
+              
+              <div className="pt-2 mt-2 border-t border-white/10 px-3 pb-2">
+                <p className="text-xs text-blue-300 mb-2">Alternar Perfil</p>
+                <div className="flex space-x-2">
+                  <button onClick={() => setRole('admin')} className={`flex-1 py-1 rounded text-xs ${role==='admin' ? 'bg-[#005CAA]' : 'bg-[#001529]'}`}>Admin (CMOV)</button>
+                  <button onClick={() => setRole('user')} className={`flex-1 py-1 rounded text-xs ${role==='user' ? 'bg-[#005CAA]' : 'bg-[#001529]'}`}>Usuário (Escola)</button>
+                </div>
+              </div>
+            </nav>
+          </div>
+        )}
+
+        {/* Dynamic Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
+          
+          <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">
+                {view === 'dashboard' && 'Visão Geral CMOV'}
+                {view === 'reservas' && 'Gestão de Reservas U.M'}
+                {view === 'gantt' && 'Monitoramento e Cronograma'}
+              </h2>
+              <p className="text-slate-500 text-sm mt-1">Acompanhe e gerencie a frota de unidades móveis do SENAI Goiás.</p>
+            </div>
+            
+            {/* Context Actions */}
+            {view === 'dashboard' && (
+              <button className="flex items-center px-4 py-2 bg-white border border-slate-300 shadow-sm rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                <FileSpreadsheet size={18} className="mr-2 text-green-600" /> Exportar Relatório
+              </button>
+            )}
+          </div>
+
+          {/* Render Views based on state */}
+          {view === 'dashboard' && <DashboardView />}
+          {view === 'reservas' && <ReservasView />}
+          {view === 'gantt' && <GanttView />}
+
+        </div>
+      </main>
+
+      <ModalCadastro />
+    </div>
+  );
+}
